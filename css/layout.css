@@ -82,24 +82,12 @@
   box-shadow: none;
 }
 
-/* NOTE: .session-header below is malformed in the original source file
-   (an orphaned declaration block with no selector follows it, lines that
-   used to belong to a second, removed rule). Browsers silently discard the
-   invalid block, so it has no visible effect; preserved as-is to avoid
-   changing existing behavior. */
 .session-header {
   text-align: center;
   margin-bottom: 1rem;
   color: var(--dark-navy);
   font-size: 0.85rem;
   display: none;
-}
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid var(--border-color);
 }
 
 .session-title {

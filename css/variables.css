@@ -13,4 +13,15 @@
   --green: #51CF66;
   --bg-light: #F9F7F3;
   --teal: #5B8A7A;
+
+  /* These were referenced throughout the original stylesheet (streak
+     badges, timer accents, association notes, card backgrounds) but were
+     never defined in :root, so those elements silently rendered with
+     transparent/invalid colors. Filled in to match the app's sage/cream
+     palette. */
+  --purple: #8B7FD6;
+  --blue-accent: #00D9FF;
+  --border-color: #E5E5E5;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F5F1E8;
 }

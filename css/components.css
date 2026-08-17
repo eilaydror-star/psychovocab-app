@@ -501,7 +501,13 @@
 .mastery-section {
   margin: 2rem 0;
   padding: 1.5rem;
-  background: linear-gradient(135deg, var(--purple)22 0%, var(--blue-accent)22 100%);
+  /* NOTE: the original source tried to append a hex alpha suffix directly
+     onto var(--purple)/var(--blue-accent) (e.g. "var(--purple)22"), which
+     is not valid CSS - var() substitution doesn't merge with an adjacent
+     token, so the whole gradient was silently dropped. Rewritten as
+     equivalent rgba() colors (~13% opacity, matching the intended "22"
+     hex alpha). */
+  background: linear-gradient(135deg, rgba(139, 127, 214, 0.13) 0%, rgba(0, 217, 255, 0.13) 100%);
   border: 1px solid var(--purple);
   border-radius: 12px;
 }
@@ -565,19 +571,13 @@
   flex-wrap: wrap;
 }
 
-/* NOTE: .btn-secondary is intentionally defined twice in the original
-   source (here and above) - the later rule wins per normal CSS cascade.
-   Preserved as-is. */
-.btn-secondary {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover {
-  background: var(--border-color);
-  transform: translateY(-2px);
-}
+/* NOTE: the original source redefined .btn-secondary here a second time
+   (background/border using vars that weren't even in :root), which - by
+   normal CSS cascade rules - silently overrode the intended teal-bordered
+   secondary button (defined earlier, near .btn-primary) everywhere in the
+   app: the level selector, "info" button, modal close button, etc. all
+   ended up borderless/transparent. Removed as an unintended duplicate;
+   the earlier definition is the one actually meant to apply. */
 
 .save-indicator {
   display: none;

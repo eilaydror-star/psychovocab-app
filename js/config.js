@@ -12,5 +12,5 @@ export const FIREBASE_CONFIG = {
   storageBucket: "psychometric-app-englishwords.firebasestorage.app",
   messagingSenderId: "717469959282",
   appId: "1:717469959282:web:c83734aaeffa9e3be46eeb",
-  databaseURL: "https://psychometric-app-englishwords-default-rtdb.firebaseio.com"
+  databaseURL: "https://psychometric-app-englishwords-default-rtdb.europe-west1.firebasedatabase.app"
 };
