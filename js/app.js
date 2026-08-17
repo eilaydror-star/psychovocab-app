@@ -6,6 +6,7 @@
         this.currentSession = [];
         this.sessionIndex = 0;
         this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
+        this.lastAction = null; // Last grid mark, for undo
         this.lastSaved = null;
         this.autoSaveInterval = null;
         this.currentUser = null; // Firebase user
@@ -455,13 +456,19 @@
         if (document.activeElement.tagName === 'TEXTAREA') {
           return;
         }
-        
+        // Only meaningful during an active grid session
+        if (!this.sessionActive) {
+          return;
+        }
+
         if (e.key === 'ArrowRight') {
           e.preventDefault();
-          this.handleAnswer(true);
+          const word = this.getCurrentSessionWord();
+          if (word) this.markWordKnown(word);
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault();
-          this.handleAnswer(false);
+          const word = this.getCurrentSessionWord();
+          if (word) this.markWordUnknown(word);
         } else if (e.key === ' ') {
           e.preventDefault();
           this.toggleTranslation();
@@ -473,16 +480,24 @@
           this.goBack();
         }
       }
-      
-      toggleTranslation() {
-        const hebrewEl = document.getElementById('hebrew-word');
-        const hint = document.getElementById('toggle-hint');
-        if (!hebrewEl) return;
-        const isHidden = hebrewEl.style.display === 'none';
-        hebrewEl.style.display = isHidden ? 'block' : 'none';
-        if (hint) hint.style.display = isHidden ? 'none' : 'block';
+
+      // The grid shows every active word at once (no single "current card"),
+      // so keyboard shortcuts act on the first not-yet-mastered word - same
+      // one that visually appears first in the grid.
+      getCurrentSessionWord() {
+        return this.currentSession.find(w => w.status !== 'green');
       }
-      
+
+      toggleTranslation() {
+        const word = this.getCurrentSessionWord();
+        if (!word) return;
+        const hebrewEl = document.getElementById(`hebrew-${word.id}`);
+        const hintEl = document.getElementById(`hint-${word.id}`);
+        if (!hebrewEl) return;
+        hebrewEl.classList.toggle('show');
+        if (hintEl) hintEl.style.display = hebrewEl.classList.contains('show') ? 'none' : 'block';
+      }
+
       goBack() {
         // Exit session and return to menu - automatically save progress
         if (confirm('הגיע לך להפסיק את השיעור? ההתקדמות תישמר.')) {
@@ -492,15 +507,28 @@
           this.render();
         }
       }
-      
+
       undo() {
-        // Go back one word in current session
-        if (this.sessionIndex > 0) {
-          this.sessionIndex--;
-          this.render();
+        // Revert the last markWordKnown/markWordUnknown action
+        if (!this.lastAction) return;
+
+        const { word, prevStatus, prevStreak, wasCorrect } = this.lastAction;
+        word.status = prevStatus;
+        word.streak = prevStreak;
+
+        if (wasCorrect) {
+          this.sessionStats.correct = Math.max(0, this.sessionStats.correct - 1);
+          this.allTimeStats.totalCorrect = Math.max(0, this.allTimeStats.totalCorrect - 1);
+        } else {
+          this.sessionStats.incorrect = Math.max(0, this.sessionStats.incorrect - 1);
         }
+        this.allTimeStats.totalAttempts = Math.max(0, this.allTimeStats.totalAttempts - 1);
+
+        this.lastAction = null;
+        this.saveProgress();
+        this.render();
       }
-      
+
       updateAssociation(wordId, value) {
         // Save the association/memory aid for the word
         const word = this.words.find(w => w.id === wordId);
@@ -508,66 +536,6 @@
           word.association = value;
           this.saveProgress();
         }
-      }
-      
-      recordAnswer(correct) {
-        this.handleAnswer(correct);
-      }
-      
-      handleAnswer(correct) {
-        const word = this.currentSession[this.sessionIndex];
-        
-        if (correct) {
-          word.streak = (word.streak || 0) + 1;
-          this.sessionStats.correct++;
-          
-          if (word.streak === 2) {
-            word.status = 'green';
-          } else if (word.streak === 1) {
-            word.status = 'orange';
-          }
-          
-          this.sessionStats.streak++;
-        } else {
-          word.streak = 0;
-          word.status = 'red';
-          this.sessionStats.incorrect++;
-          this.sessionStats.streak = 0;
-        }
-        
-        this.allTimeStats.totalAttempts++;
-        if (correct) this.allTimeStats.totalCorrect++;
-        
-        this.sessionIndex++;
-        
-        // Check if reached end of current round
-        if (this.sessionIndex >= this.currentSession.length) {
-          // Check if ALL words in session have 2+ correct (100% mastery)
-          const allMastered = this.currentSession.every(w => w.streak >= 2);
-          
-          if (allMastered) {
-            // Session complete!
-            this.sessionActive = false;
-            
-            // Check if should unlock next level (structured mode)
-            if (this.levelProgression === 'structured') {
-              const currentLevelWords = this.words.filter(w => w.difficulty === this.currentLevel);
-              const allLevelMastered = currentLevelWords.every(w => w.status === 'green');
-              
-              if (allLevelMastered) {
-                this.unlockNextLevel();
-              }
-            }
-          } else {
-            // Not all correct yet - shuffle and continue session
-            this.sessionIndex = 0;
-            const shuffled = [...this.currentSession].sort(() => Math.random() - 0.5);
-            this.currentSession = shuffled;
-          }
-        }
-        
-        this.saveState();
-        this.render();
       }
       
       getStats() {
@@ -890,7 +858,7 @@
             <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">🎯 מטרה סופית</h3>
             
             <div style="background: rgba(0, 217, 255, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--teal);">
-              <p style="margin: 0;">בעזרת שיעורים קבועים וחזרה משכללת, תשלוט בכל 8,623 המילים! הכל תלוי בעקביות וקשב. בהצלחה! 🚀</p>
+              <p style="margin: 0;">בעזרת שיעורים קבועים וחזרה משכללת, תשלוט בכל 3,500 המילים! הכל תלוי בעקביות וקשב. בהצלחה! 🚀</p>
             </div>
           </div>
         `;
@@ -968,75 +936,6 @@
         this.render();
       }
       
-      setupSwipeDetection(element) {
-        let startX = 0;
-        let endX = 0;
-        let startTime = 0;
-        let isMouseDown = false;
-        const minSwipeDistance = 50;
-        const maxSwipeDuration = 1000;
-        
-        const onStart = (clientX) => {
-          startX = clientX;
-          startTime = Date.now();
-          element.style.opacity = '0.9';
-          isMouseDown = true;
-        };
-        
-        const onMove = (clientX) => {
-          if (!isMouseDown) return;
-          endX = clientX;
-          const distance = endX - startX;
-          
-          if (distance > 20) {
-            element.classList.add('swiping-left');
-            element.classList.remove('swiping-right');
-          } else if (distance < -20) {
-            element.classList.add('swiping-right');
-            element.classList.remove('swiping-left');
-          }
-        };
-        
-        const onEnd = () => {
-          if (!isMouseDown) return;
-          isMouseDown = false;
-          element.style.opacity = '1';
-          element.classList.remove('swiping-left', 'swiping-right');
-          
-          const distance = endX - startX;
-          const duration = Date.now() - startTime;
-          
-          if (Math.abs(distance) > minSwipeDistance && duration < maxSwipeDuration) {
-            if (distance > 0) {
-              this.handleAnswer(true);
-            } else {
-              this.handleAnswer(false);
-            }
-          }
-        };
-        
-        element.addEventListener('touchstart', (e) => {
-          onStart(e.changedTouches[0].clientX);
-        });
-        
-        element.addEventListener('touchmove', (e) => {
-          onMove(e.changedTouches[0].clientX);
-        });
-        
-        element.addEventListener('touchend', onEnd);
-        
-        element.addEventListener('mousedown', (e) => {
-          onStart(e.clientX);
-        });
-        
-        element.addEventListener('mousemove', (e) => {
-          onMove(e.clientX);
-        });
-        
-        element.addEventListener('mouseup', onEnd);
-        element.addEventListener('mouseleave', onEnd);
-      }
-      
       setupKeyboardDetection() {
         document.addEventListener('keydown', this.keyboardHandler);
       }
@@ -1047,7 +946,7 @@
         // Check if user needs to login
         // Show login if: Firebase is ready but no user logged in
         // OR: Login screen should always show on first load (unless user skipped it)
-        if ((firebaseReady && !currentUser) || (!this.userSkippedLogin && !currentUser && !this.sessionActive && !this.showLevelSelector)) {
+        if ((firebaseReady && !currentUser && !this.userSkippedLogin) || (!this.userSkippedLogin && !currentUser && !this.sessionActive && !this.showLevelSelector)) {
           this.renderLoginScreen(appContent);
           return;
         }
@@ -1222,6 +1121,10 @@
       }
       
       renderLevelSelector(appContent) {
+        const easyCount = this.words.filter(w => w.difficulty === 'easy').length;
+        const modCount = this.words.filter(w => w.difficulty === 'moderate').length;
+        const hardCount = this.words.filter(w => w.difficulty === 'hard').length;
+
         let html = `
           <div class="start-screen">
             <div class="start-title">🎯 בחר כיצד ללמוד</div>
@@ -1259,7 +1162,7 @@
                   🟢 רק קל
                 </div>
                 <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  2,530 מילים שכיחות - בסיס יציב (90% בבחינה)
+                  ${easyCount.toLocaleString()} מילים שכיחות - בסיס יציב (90% בבחינה)
                 </div>
               </button>
               
@@ -1270,7 +1173,7 @@
                   🟡 רק בינוני
                 </div>
                 <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  3,859 מילים מדיום - אתגר בינוני (70% בבחינה)
+                  ${modCount.toLocaleString()} מילים מדיום - אתגר בינוני (70% בבחינה)
                 </div>
               </button>
               
@@ -1281,7 +1184,7 @@
                   🔴 רק קשה
                 </div>
                 <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  877 מילים נדירות - אלוף (35% בבחינה)
+                  ${hardCount.toLocaleString()} מילים נדירות - אלוף (35% בבחינה)
                 </div>
               </button>
             </div>
@@ -1734,6 +1637,8 @@
       }
       
       markWordKnown(word) {
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, wasCorrect: true };
+
         // Progress the word's status
         if (!word.status || word.status === 'red') {
           // First time: red -> orange
@@ -1743,16 +1648,28 @@
           // Second time: orange -> green (mastered)
           word.status = 'green';
           word.streak = 2;
+
+          // Structured mode: unlock the next level once every word in the
+          // current level is mastered.
+          if (this.levelProgression === 'structured') {
+            const currentLevelWords = this.words.filter(w => w.difficulty === this.currentLevel);
+            const allLevelMastered = currentLevelWords.every(w => w.status === 'green');
+            if (allLevelMastered) {
+              this.unlockNextLevel();
+            }
+          }
         }
-        
+
         this.sessionStats.correct++;
         this.allTimeStats.totalAttempts++;
         this.allTimeStats.totalCorrect++;
         this.saveProgress();
         this.render();
       }
-      
+
       markWordUnknown(word) {
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, wasCorrect: false };
+
         // User swiped LEFT (doesn't know)
         if (word.status === 'orange') {
           // If was orange, go back to red (forgot it)
@@ -1760,7 +1677,7 @@
           word.streak = 0;
         }
         // If already red, stay red (no change)
-        
+
         this.sessionStats.incorrect++;
         this.allTimeStats.totalAttempts++;
         this.saveProgress();

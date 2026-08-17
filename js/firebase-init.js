@@ -34,7 +34,12 @@ function initializeFirebase() {
 
         if (user) {
           console.log('User logged in:', user.email);
-          window.app.syncProgressWithFirebase();
+          // Pull the user's saved cloud progress down (not push local state
+          // up) - this fires on every login, including auto-restored
+          // sessions, so it must be the "load" direction or a fresh/empty
+          // device would silently overwrite real cloud progress with a
+          // blank slate.
+          window.app.loadProgressFromFirebase();
         } else {
           console.log('No user logged in');
         }
