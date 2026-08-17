@@ -1132,7 +1132,7 @@
               </div>
               
               <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-secondary); text-align: center;">
-                <p style="margin: 0;">⚠️ Firebase לא מוגדר? השתמש ב- localStorage</p>
+                <p style="margin: 0;">ההתקדמות תישמר במכשיר זה בלבד ולא תסונכרן בין מכשירים</p>
                 <button onclick="app.continueWithoutLogin()" style="color: var(--teal); background: none; border: none; cursor: pointer; text-decoration: underline; margin-top: 0.5rem;">המשך ללא כניסה</button>
               </div>
             </div>
