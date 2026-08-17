@@ -122,7 +122,7 @@
   position: absolute;
   top: 1rem;
   left: 1rem;
-  background: var(--purple);
+  background: var(--sage-green);
   color: white;
   padding: 0.4rem 0.8rem;
   border-radius: 20px;
@@ -201,11 +201,11 @@
 
 /* Timer Styles */
 .timer-container {
-  background: linear-gradient(135deg, rgba(0, 217, 255, 0.15) 0%, rgba(255, 165, 0, 0.1) 100%);
+  background: var(--bg-light);
   padding: 2rem;
   border-radius: 16px;
   margin-bottom: 1.5rem;
-  border: 1px solid rgba(0, 217, 255, 0.3);
+  border: 1px solid var(--border-light);
   text-align: center;
 }
 
@@ -231,20 +231,15 @@
 }
 
 .timer-circle {
-  width: 200px;
-  height: 200px;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-hover) 100%);
+  background: white;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 8px 32px rgba(0, 217, 255, 0.2), inset 0 2px 8px rgba(255, 255, 255, 0.1);
-  border: 3px solid var(--teal);
-}
-
-.timer-circle.active {
-  animation: timerPulse 2s ease-in-out infinite;
+  border: 2px solid var(--sage-green);
 }
 
 .timer-time {
@@ -272,7 +267,7 @@
 
 .timer-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--teal) 0%, var(--blue-accent) 100%);
+  background: var(--sage-green);
   width: 100%;
   transition: width 1s linear;
 }
@@ -294,44 +289,35 @@
   transition: all 0.3s ease;
 }
 
-.timer-button.start {
-  background: linear-gradient(135deg, var(--teal) 0%, var(--blue-accent) 100%);
+.timer-button.start,
+.timer-button.resume {
+  background: var(--sage-green);
   color: white;
 }
 
-.timer-button.start:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 217, 255, 0.4);
+.timer-button.start:hover,
+.timer-button.resume:hover {
+  background: #4A7566;
 }
 
 .timer-button.pause {
-  background: var(--orange);
-  color: white;
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .timer-button.pause:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 165, 0, 0.4);
-}
-
-.timer-button.resume {
-  background: var(--teal);
-  color: white;
-}
-
-.timer-button.resume:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 217, 255, 0.4);
+  background: var(--border-color);
 }
 
 .timer-button.stop {
-  background: #FF6B6B;
-  color: white;
+  background: white;
+  color: var(--red);
+  border: 1px solid var(--red);
 }
 
 .timer-button.stop:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  background: rgba(231, 76, 60, 0.05);
 }
 
 .timer-presets {
@@ -343,22 +329,21 @@
 
 .timer-preset {
   padding: 1rem;
-  border: 2px solid var(--teal);
+  border: 1px solid var(--sage-green);
   border-radius: 8px;
   background: transparent;
-  color: var(--teal);
+  color: var(--sage-green);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.2s ease;
 }
 
 .timer-preset:hover {
-  background: rgba(0, 217, 255, 0.1);
-  transform: translateY(-2px);
+  background: rgba(91, 138, 122, 0.06);
 }
 
 .timer-preset.active {
-  background: var(--teal);
+  background: var(--sage-green);
   color: white;
 }
 
@@ -501,14 +486,8 @@
 .mastery-section {
   margin: 2rem 0;
   padding: 1.5rem;
-  /* NOTE: the original source tried to append a hex alpha suffix directly
-     onto var(--purple)/var(--blue-accent) (e.g. "var(--purple)22"), which
-     is not valid CSS - var() substitution doesn't merge with an adjacent
-     token, so the whole gradient was silently dropped. Rewritten as
-     equivalent rgba() colors (~13% opacity, matching the intended "22"
-     hex alpha). */
-  background: linear-gradient(135deg, rgba(139, 127, 214, 0.13) 0%, rgba(0, 217, 255, 0.13) 100%);
-  border: 1px solid var(--purple);
+  background: var(--bg-light);
+  border: 1px solid var(--border-light);
   border-radius: 12px;
 }
 
@@ -551,7 +530,7 @@
 .session-stat-value {
   font-size: 2rem;
   font-weight: 600;
-  color: var(--blue-accent);
+  color: var(--sage-green);
   margin-bottom: 0.3rem;
 }
 
@@ -699,7 +678,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--purple);
+  background: var(--sage-green);
   color: white;
   border: none;
   cursor: pointer;
@@ -727,7 +706,7 @@
 .association-box {
   background: transparent;
   border: none;
-  border-left: 2px solid var(--purple);
+  border-left: 2px solid var(--sage-green);
   border-radius: 0;
   padding: 0.75rem 0 0.75rem 1rem;
   margin-top: 1rem;
@@ -736,7 +715,7 @@
 
 .association-label {
   font-size: 0.75rem;
-  color: var(--purple);
+  color: var(--sage-green);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.3rem;
@@ -770,7 +749,7 @@
 
 #association-input:focus {
   outline: none;
-  border-color: var(--purple);
+  border-color: var(--sage-green);
 }
 
 .char-count {

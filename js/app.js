@@ -789,7 +789,7 @@
         const content = `
           <div style="max-height: 70vh; overflow-y: auto; direction: rtl;">
             <!-- Hebrew Explanation Only -->
-            <div style="background: linear-gradient(135deg, rgba(0, 217, 255, 0.15) 0%, rgba(81, 207, 102, 0.1) 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid rgba(0, 217, 255, 0.3);">
+            <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
               <h3 style="color: var(--teal); margin-top: 0; margin-bottom: 1rem;">🧠 מערכת הרמזור - איך זה עובד?</h3>
               
               <p style="margin-bottom: 1rem; line-height: 1.8; color: var(--text-secondary);">
@@ -857,7 +857,7 @@
             
             <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">🎯 מטרה סופית</h3>
             
-            <div style="background: rgba(0, 217, 255, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--teal);">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-light);">
               <p style="margin: 0;">בעזרת שיעורים קבועים וחזרה משכללת, תשלוט בכל 3,500 המילים! הכל תלוי בעקביות וקשב. בהצלחה! 🚀</p>
             </div>
           </div>
@@ -971,7 +971,7 @@
       renderLoginScreen(appContent) {
         let html = `
           <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;">
-            <div style="background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; width: 100%;">
+            <div style="background: white; border-radius: 16px; padding: 2rem; border: 1px solid var(--border-light); max-width: 400px; width: 100%;">
               <div style="text-align: center; margin-bottom: 2rem;">
                 <div style="font-size: 2.5rem; margin-bottom: 1rem;">📚</div>
                 <h1 style="font-size: 1.8rem; font-weight: 600; color: var(--dark-navy); margin: 0 0 0.5rem;">PsychoVocab</h1>
@@ -995,7 +995,7 @@
                   
                   <div id="login-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
                   
-                  <button onclick="app.handleLogin()" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, var(--sage-green) 0%, rgba(91, 138, 122, 0.8) 100%); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
+                  <button onclick="app.handleLogin()" style="width: 100%; padding: 0.75rem; background: var(--sage-green); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
                     כניסה
                   </button>
                   
@@ -1020,7 +1020,7 @@
                   
                   <div id="register-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
                   
-                  <button onclick="app.handleRegister()" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, var(--sage-green) 0%, rgba(91, 138, 122, 0.8) 100%); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
+                  <button onclick="app.handleRegister()" style="width: 100%; padding: 0.75rem; background: var(--sage-green); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
                     הרשמה
                   </button>
                   
@@ -1189,7 +1189,7 @@
               </button>
             </div>
             
-            <div style="background: rgba(0, 217, 255, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--teal);">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-light);">
               <strong>💡 המלצה:</strong> אם אתה מתחיל, בחר בהתקדמות מובנית או בחירה חופשית.
             </div>
           </div>
@@ -1221,7 +1221,7 @@
         const hardCount = this.words.filter(w => w.difficulty === 'hard').length;
         
         html += `
-          <div style="background: linear-gradient(135deg, #F9F7F3 0%, #F5F1E8 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--border-light); box-shadow: 0 2px 8px rgba(92, 138, 122, 0.06);">
+          <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
             <div style="font-weight: 600; margin-bottom: 1rem; text-align: center; color: var(--sage-green);">
               🎯 בחר רמות קושי לשינון
             </div>
@@ -1498,38 +1498,14 @@
               <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
                 החליק ימינה כדי לסמן כשידוע | החליק שמאלה אם לא יודע
               </div>
-              <div style="background: linear-gradient(135deg, var(--light-sage) 0%, rgba(255,255,255,0.8) 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border-light);">
-                <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                  <span>⌨️</span> קיצורי מקלדת
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem;">
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="background: white; border: 2px solid var(--sage-green); border-radius: 6px; padding: 0.4rem 0.6rem; font-weight: 600; color: var(--sage-green); font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">→</div>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">יודע</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="background: white; border: 2px solid var(--red); border-radius: 6px; padding: 0.4rem 0.6rem; font-weight: 600; color: var(--red); font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">←</div>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">לא יודע</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="background: white; border: 2px solid var(--teal); border-radius: 6px; padding: 0.4rem 0.6rem; font-weight: 600; color: var(--teal); font-size: 0.8rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Space</div>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">גלוי</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="background: white; border: 2px solid var(--orange); border-radius: 6px; padding: 0.4rem 0.6rem; font-weight: 600; color: var(--orange); font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">U</div>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">ביטול</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div style="background: white; border: 2px solid var(--gold-accent); border-radius: 6px; padding: 0.4rem 0.6rem; font-weight: 600; color: var(--gold-accent); font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">B</div>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">חזור</span>
-                  </div>
-                </div>
+              <div style="background: var(--bg-light); padding: 1.25rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-secondary);">
+                → יודע &nbsp;·&nbsp; ← לא יודע &nbsp;·&nbsp; Space גלוי &nbsp;·&nbsp; U ביטול &nbsp;·&nbsp; B חזור
               </div>
               <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
-                <button onclick="app.undo()" style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, var(--text-secondary) 0%, rgba(107, 114, 128, 0.8) 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 0.5rem;">
+                <button onclick="app.undo()" class="btn btn-secondary">
                   ↶ ביטול (U)
                 </button>
-                <button onclick="app.goBack()" style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, var(--red) 0%, rgba(231, 76, 60, 0.8) 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3); display: flex; align-items: center; gap: 0.5rem;">
+                <button onclick="app.goBack()" class="btn" style="color: var(--red); border-color: var(--red);">
                   ← חזור לתפריט (B)
                 </button>
               </div>

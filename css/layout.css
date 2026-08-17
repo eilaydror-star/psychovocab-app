@@ -137,13 +137,10 @@
 }
 
 .start-title {
-  font-size: 2.8rem;
-  font-weight: 800;
+  font-size: 2.2rem;
+  font-weight: 700;
   margin-bottom: 1.2rem;
-  background: linear-gradient(135deg, var(--teal) 0%, var(--blue-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--dark-navy);
 }
 
 .start-description {
