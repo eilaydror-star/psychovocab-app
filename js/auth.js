@@ -1,6 +1,4 @@
-import { firebaseReady, auth, setCurrentUser } from './firebase-init.js';
-
-export function registerUser(email, password) {
+function registerUser(email, password) {
   return new Promise((resolve, reject) => {
     if (!firebaseReady) {
       reject('Firebase not ready');
@@ -16,7 +14,7 @@ export function registerUser(email, password) {
   });
 }
 
-export function loginUser(email, password) {
+function loginUser(email, password) {
   return new Promise((resolve, reject) => {
     if (!firebaseReady) {
       reject('Firebase not ready');
@@ -32,7 +30,7 @@ export function loginUser(email, password) {
   });
 }
 
-export function logoutUser() {
+function logoutUser() {
   return new Promise((resolve, reject) => {
     if (!firebaseReady) {
       reject('Firebase not ready');

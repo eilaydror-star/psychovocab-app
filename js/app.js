@@ -1,9 +1,4 @@
-﻿import { WORDS_DATA } from './words-data.js';
-import { firebaseReady, currentUser, db } from './firebase-init.js';
-import { loginUser, registerUser, logoutUser } from './auth.js';
-import { saveToLocalStorage, loadFromLocalStorage } from './storage.js';
-
-    class VocabularyApp {
+﻿    class VocabularyApp {
       constructor() {
         this.words = this.initializeWords();
         this.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };

@@ -5,7 +5,7 @@
 // Real access control comes from Firebase Authentication plus the
 // Realtime Database security rules configured in the Firebase console,
 // not from hiding these values.
-export const FIREBASE_CONFIG = {
+const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBFuJXzZkDxTtav687HIr6AUjAMo0w5uYc",
   authDomain: "psychometric-app-englishwords.firebaseapp.com",
   projectId: "psychometric-app-englishwords",

@@ -1,4 +1,4 @@
-﻿export const WORDS_DATA = [
+﻿const WORDS_DATA = [
           { id: 1, english: "outskirts", hebrew: "פרוורים", emoji: "📚", status: "red", streak: 0, association: "", difficulty: "moderate", testProbability: 0.7 },
           { id: 2, english: "meticulous", hebrew: "מדוקדק, קפדני", emoji: "📚", status: "red", streak: 0, association: "", difficulty: "hard", testProbability: 0.35 },
           { id: 3, english: "impregnable", hebrew: "בלתי חדיר, בלתי מנוצח", emoji: "📚", status: "red", streak: 0, association: "", difficulty: "hard", testProbability: 0.35 },

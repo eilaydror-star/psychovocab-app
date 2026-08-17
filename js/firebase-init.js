@@ -1,21 +1,20 @@
-import { FIREBASE_CONFIG } from './config.js';
+// These are shared globals (this file is a plain script, not a module, so
+// index.html can be opened directly via file:// - see js/auth.js and
+// js/app.js, which are loaded after this file and read/reassign these
+// same top-level bindings).
+let firebaseReady = false;
+let currentUser = null;
+let auth = null;
+let db = null;
 
-// These are mutable module state, exported as live bindings so other
-// modules (auth.js, app.js) always see the current value without needing
-// setters for reads - only this module ever assigns them directly.
-export let firebaseReady = false;
-export let currentUser = null;
-export let auth = null;
-export let db = null;
-
-export function setCurrentUser(user) {
+function setCurrentUser(user) {
   currentUser = user;
   if (window.app) {
     window.app.currentUser = user;
   }
 }
 
-export function initializeFirebase() {
+function initializeFirebase() {
   if (FIREBASE_CONFIG.apiKey.includes('YOUR_')) {
     console.log('Firebase config not set. Falling back to localStorage.');
     return false;
