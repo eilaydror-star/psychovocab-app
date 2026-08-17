@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מערכת שינון מילים באנגלית - הכנה פסיכומטרית</title>
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body dir="rtl" style="direction: rtl; text-align: right;">
+  <!-- Logo Fixed in Upper Right Corner -->
+  <div style="position: fixed; top: 0.5rem; right: 0.5rem; z-index: 10000; background: white; padding: 0.5rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.15);">
+    <img src="assets/logo.png" alt="Logo" style="width: 120px; height: auto; display: block;">
+  </div>
+
+  <div class="container">
+      <div class="stats-container">
+        <div class="stat-card">
+          <div class="stat-value" id="total-mastered">0</div>
+          <div class="stat-label">שולט</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="total-remaining">3500</div>
+          <div class="stat-label">מילים נותרות</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="app-content">
+          <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;">
+            <div style="background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; width: 100%;">
+              <div style="text-align: center; margin-bottom: 2rem;">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📚</div>
+                <h1 style="font-size: 1.8rem; font-weight: 600; color: var(--dark-navy); margin: 0 0 0.5rem;">PsychoVocab</h1>
+                <p style="color: var(--text-secondary); margin: 0;">הכנה פסיכומטרית עם שמירת התקדמות</p>
+              </div>
+
+              <div id="auth-form-container">
+                <!-- Login Form -->
+                <div id="login-form" style="display: block;">
+                  <h2 style="font-size: 1.3rem; color: var(--dark-navy); margin-bottom: 1.5rem; text-align: center;">כניסה</h2>
+
+                  <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
+                    <input type="email" id="login-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                  </div>
+
+                  <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה</label>
+                    <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                  </div>
+
+                  <div id="login-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
+
+                  <button onclick="app.handleLogin()" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, var(--sage-green) 0%, rgba(91, 138, 122, 0.8) 100%); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
+                    כניסה
+                  </button>
+
+                  <p style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                    אין לך חשבון? <a href="#" onclick="app.toggleAuthForm(event)" style="color: var(--teal); text-decoration: none; font-weight: 500;">הרשמה</a>
+                  </p>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-form" style="display: none;">
+                  <h2 style="font-size: 1.3rem; color: var(--dark-navy); margin-bottom: 1.5rem; text-align: center;">הרשמה</h2>
+
+                  <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
+                    <input type="email" id="register-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                  </div>
+
+                  <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה (לפחות 6 תווים)</label>
+                    <input type="password" id="register-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                  </div>
+
+                  <div id="register-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
+
+                  <button onclick="app.handleRegister()" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, var(--sage-green) 0%, rgba(91, 138, 122, 0.8) 100%); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
+                    הרשמה
+                  </button>
+
+                  <p style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                    יש לך כבר חשבון? <a href="#" onclick="app.toggleAuthForm(event)" style="color: var(--teal); text-decoration: none; font-weight: 500;">כניסה</a>
+                  </p>
+                </div>
+              </div>
+
+              <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-secondary); text-align: center;">
+                <p style="margin: 0;">⚠️ Firebase לא מוגדר? השתמש ב- localStorage</p>
+                <button onclick="app.continueWithoutLogin()" style="color: var(--teal); background: none; border: none; cursor: pointer; text-decoration: underline; margin-top: 0.5rem;">המשך ללא כניסה</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+    <div id="modal-overlay" class="modal-overlay" style="display: none;">
+      <div class="modal">
+        <div class="modal-header" id="modal-title">Save Progress</div>
+        <div class="modal-content" id="modal-body"></div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="app.closeModal()">סגור</button>
+        </div>
+      </div>
+    </div>
+
+    <input type="file" id="file-import" accept=".json" onchange="app.importProgress(event)">
+
+  <!-- Firebase compat SDK (matches the firebase.initializeApp / firebase.auth() / firebase.database() API used in js/firebase-init.js) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
