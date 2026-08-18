@@ -42,6 +42,7 @@
           this.loadState();
         }
         this.setupKeyboardDetection();
+        this.setupBackButtonHandling();
         this.setupAutoSave();
         this.render();
       }
@@ -527,11 +528,11 @@
         if (e.key === 'ArrowRight') {
           e.preventDefault();
           const word = this.getCurrentSessionWord();
-          if (word) this.markWordKnown(word);
+          if (word) this.gradeCurrentCard(word, true);
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault();
           const word = this.getCurrentSessionWord();
-          if (word) this.markWordUnknown(word);
+          if (word) this.gradeCurrentCard(word, false);
         } else if (e.key === ' ') {
           e.preventDefault();
           this.toggleTranslation();
@@ -544,21 +545,23 @@
         }
       }
 
-      // The grid shows every active word at once (no single "current card"),
-      // so keyboard shortcuts act on the first not-yet-mastered word - same
-      // one that visually appears first in the grid.
+      // The session shows exactly one word at a time - this returns
+      // whichever one that is, matching the same not-mastered/due filter
+      // renderSession() uses, so keyboard shortcuts always act on the
+      // card actually on screen.
       getCurrentSessionWord() {
-        return this.currentSession.find(w => w.status !== 'green');
+        const now = Date.now();
+        return this.currentSession.find(w =>
+          w.status !== 'green' && (w.status === 'red' || !w.dueAt || w.dueAt <= now)
+        );
       }
 
       toggleTranslation() {
-        const word = this.getCurrentSessionWord();
-        if (!word) return;
-        const hebrewEl = document.getElementById(`hebrew-${word.id}`);
-        const hintEl = document.getElementById(`hint-${word.id}`);
+        const hebrewEl = document.getElementById('hebrew-word');
+        const hintEl = document.getElementById('toggle-hint');
         if (!hebrewEl) return;
-        hebrewEl.classList.toggle('show');
-        if (hintEl) hintEl.style.display = hebrewEl.classList.contains('show') ? 'none' : 'block';
+        hebrewEl.classList.toggle('hidden');
+        if (hintEl) hintEl.style.display = hebrewEl.classList.contains('hidden') ? 'block' : 'none';
       }
 
       goBack() {
@@ -993,17 +996,68 @@
         document.addEventListener('keydown', this.keyboardHandler);
       }
       
+      getScreenType() {
+        // Mirrors the login-screen condition in render() exactly, so the
+        // back-button history stack always agrees with what render()
+        // actually shows.
+        if ((firebaseReady && !currentUser && !this.userSkippedLogin) || (!this.userSkippedLogin && !currentUser && !this.sessionActive && !this.showLevelSelector)) {
+          return 'login';
+        }
+        if (this.showLevelSelector) return 'level-selector';
+        if (this.sessionActive) return 'session';
+        return 'start';
+      }
+
+      setupBackButtonHandling() {
+        window.addEventListener('popstate', (e) => {
+          const screen = e.state && e.state.screen;
+          if (screen) {
+            this.applyScreenState(screen);
+          }
+        });
+      }
+
+      applyScreenState(screen) {
+        // Reached by pressing the browser/gesture back (or forward) button.
+        // Mirror it to an equivalent in-app transition instead of just
+        // leaving the underlying data changed but the UI stuck.
+        if (screen === 'login') {
+          this.userSkippedLogin = false;
+        } else if (screen === 'level-selector') {
+          this.sessionActive = false;
+          this.showLevelSelector = true;
+        } else if (screen === 'start') {
+          this.sessionActive = false;
+          this.showLevelSelector = false;
+        } else if (screen === 'session') {
+          this.showLevelSelector = false;
+          this.sessionActive = this.currentSession.length > 0;
+        }
+        this.saveProgress();
+        this._skipNextHistoryPush = true;
+        this.render();
+      }
+
       render() {
         const appContent = document.getElementById('app-content');
-        
+
+        const screenType = this.getScreenType();
+        if (this._pushedScreen === undefined || this._skipNextHistoryPush) {
+          history.replaceState({ screen: screenType }, '', location.href);
+          this._skipNextHistoryPush = false;
+        } else if (this._pushedScreen !== screenType) {
+          history.pushState({ screen: screenType }, '', location.href);
+        }
+        this._pushedScreen = screenType;
+
         // Check if user needs to login
         // Show login if: Firebase is ready but no user logged in
         // OR: Login screen should always show on first load (unless user skipped it)
-        if ((firebaseReady && !currentUser && !this.userSkippedLogin) || (!this.userSkippedLogin && !currentUser && !this.sessionActive && !this.showLevelSelector)) {
+        if (screenType === 'login') {
           this.renderLoginScreen(appContent);
           return;
         }
-        
+
         const stats = this.getStats();
         
         document.getElementById('total-mastered').textContent = stats.mastered;
@@ -1555,8 +1609,10 @@
         }
 
         const masteredCount = this.currentSession.filter(w => w.status === 'green').length;
-        const overallStats = this.getStats();
-        
+        // One word at a time, not a busy grid - less to scan, no ambiguity
+        // about which card keyboard/swipe actions apply to.
+        const word = activeWords[0];
+
         let html = `
           <div class="session-container">
             <div style="text-align: center; margin-bottom: 1.5rem;">
@@ -1567,32 +1623,28 @@
                 <div class="progress-fill" style="width: ${(masteredCount / this.currentSession.length) * 100}%"></div>
               </div>
             </div>
-            
-            <div class="grid-view">
-              ${activeWords.map(word => `
-                <div class="grid-word-card ${word.status || 'red'}" data-word-id="${word.id}">
-                  <div class="grid-word-emoji">${word.emoji}</div>
-                  <div class="grid-word-english">${word.english}</div>
-                  <div class="grid-word-hebrew" id="hebrew-${word.id}">${word.hebrew}</div>
-                  <div class="grid-word-hint" id="hint-${word.id}">לחץ לראות</div>
-                  <textarea 
-                    id="assoc-${word.id}" 
-                    class="association-input" 
-                    placeholder="💭 כתוב דרך להזכרון..."
-                    style="display: none; margin-top: 0.5rem; width: 90%; padding: 0.4rem; font-size: 0.8rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 4px;"
-                    onchange="window.app.updateAssociation(${word.id}, this.value)"
-                  >${word.association || ''}</textarea>
-                </div>
-              `).join('')}
-            </div>
-            
-            <div style="text-align: center; margin-top: 2rem; color: var(--text-secondary); font-size: 0.9rem;">
-              <div style="margin-bottom: 1rem;">לחץ על מילה לגלות התרגום</div>
-              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                החליק ימינה כדי לסמן כשידוע | החליק שמאלה אם לא יודע
+
+            <div class="word-card swipe-area" id="current-word-card">
+              <div class="word-emoji">${word.emoji}</div>
+              <div class="english-word">${word.english}</div>
+              <div class="hebrew-translation hidden" id="hebrew-word">${word.hebrew}</div>
+              <div id="toggle-hint" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">לחץ לגילוי התרגום</div>
+              <button onclick="event.stopPropagation(); app.toggleNoteField(${word.id})" style="margin-top: 1.5rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">
+                📝 ${word.association ? 'ערוך רמז אישי' : 'הוסף רמז אישי'}
+              </button>
+              <div id="note-field-wrapper" style="display: none; margin-top: 1rem;" onclick="event.stopPropagation()">
+                <textarea id="assoc-${word.id}" placeholder="💭 כתוב דרך להיזכר..." style="width: 100%; padding: 0.6rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 2px; min-height: 60px;" onchange="window.app.updateAssociation(${word.id}, this.value)">${word.association || ''}</textarea>
               </div>
-              <div style="background: var(--bg-light); padding: 1.25rem; border-radius: 2px; margin-bottom: 1rem; border: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-secondary);">
-                → יודע &nbsp;·&nbsp; ← לא יודע &nbsp;·&nbsp; Space גלוי &nbsp;·&nbsp; U ביטול &nbsp;·&nbsp; B חזור
+            </div>
+
+            <div class="swipe-hint">
+              <div class="swipe-direction incorrect"><span class="arrow">←</span> לא יודע</div>
+              <div class="swipe-direction correct">יודע <span class="arrow">→</span></div>
+            </div>
+
+            <div style="text-align: center; margin-top: 1.5rem;">
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                Space לגילוי &nbsp;·&nbsp; U ביטול &nbsp;·&nbsp; B חזור לתפריט
               </div>
               <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
                 <button onclick="app.undo()" class="btn btn-secondary">
@@ -1605,106 +1657,94 @@
             </div>
           </div>
         `;
-        
+
         appContent.innerHTML = html;
-        
-        // Setup click-to-reveal for each word
-        activeWords.forEach(word => {
-          const card = document.querySelector(`[data-word-id="${word.id}"]`);
-          if (!card) return;
-          
-          let autoHideTimer = null;
-          
-          card.addEventListener('click', (e) => {
-            const hebrewEl = document.getElementById(`hebrew-${word.id}`);
-            const hintEl = document.getElementById(`hint-${word.id}`);
-            const assocEl = document.getElementById(`assoc-${word.id}`);
-            if (hebrewEl) {
-              hebrewEl.classList.toggle('show');
-              if (hintEl) hintEl.style.display = hebrewEl.classList.contains('show') ? 'none' : 'block';
-              // Show association field when translation is revealed
-              if (assocEl) assocEl.style.display = hebrewEl.classList.contains('show') ? 'block' : 'none';
-              
-              // Clear existing timer
-              if (autoHideTimer) clearTimeout(autoHideTimer);
-              
-              // Auto-hide after 5 seconds if revealed
-              if (hebrewEl.classList.contains('show')) {
-                autoHideTimer = setTimeout(() => {
-                  hebrewEl.classList.remove('show');
-                  if (hintEl) hintEl.style.display = 'block';
-                  if (assocEl) assocEl.style.display = 'none';
-                }, 5000);
-              }
-            }
+
+        const cardEl = document.getElementById('current-word-card');
+        if (cardEl) {
+          cardEl.addEventListener('click', () => {
+            if (this._justSwiped) { this._justSwiped = false; return; }
+            this.toggleTranslation();
           });
-          
-          // Setup swipe detection for each card
-          this.setupGridSwipeDetection(card, word);
-        });
+          this.setupCardSwipeDetection(cardEl, word);
+        }
       }
-      
-      setupGridSwipeDetection(element, word) {
+
+      toggleNoteField(wordId) {
+        const wrapper = document.getElementById('note-field-wrapper');
+        if (!wrapper) return;
+        const isHidden = wrapper.style.display === 'none';
+        wrapper.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) {
+          const textarea = document.getElementById('assoc-' + wordId);
+          if (textarea) setTimeout(() => textarea.focus(), 0);
+        }
+      }
+
+      setupCardSwipeDetection(element, word) {
         let touchStartX = 0;
-        let touchEndX = 0;
-        
+
         element.addEventListener('touchstart', (e) => {
           touchStartX = e.changedTouches[0].screenX;
         }, false);
-        
+
         element.addEventListener('touchend', (e) => {
-          touchEndX = e.changedTouches[0].screenX;
-          this.handleGridSwipe(touchStartX, touchEndX, word);
+          const touchEndX = e.changedTouches[0].screenX;
+          this.handleCardSwipe(touchStartX, touchEndX, word);
         }, false);
-        
-        // Also support mouse swipe for testing
+
+        // Also support mouse swipe (desktop testing / trackpad drag)
         let mouseDown = false;
         let mouseStartX = 0;
-        
+
         element.addEventListener('mousedown', (e) => {
           mouseDown = true;
           mouseStartX = e.screenX;
         });
-        
+
         element.addEventListener('mouseup', (e) => {
           if (mouseDown) {
-            this.handleGridSwipe(mouseStartX, e.screenX, word);
+            this.handleCardSwipe(mouseStartX, e.screenX, word);
             mouseDown = false;
           }
         });
-        
+
         element.addEventListener('mouseleave', () => {
           mouseDown = false;
         });
       }
-      
-      handleGridSwipe(startX, endX, word) {
-        const swipeDistance = endX - startX;
-        const minSwipeDistance = 30;
-        
-        // Swipe right (positive distance) = mark as known
-        if (swipeDistance > minSwipeDistance) {
-          // Check if needs confirmation (hard or moderate words)
-          if (word.difficulty === 'hard' || word.difficulty === 'moderate') {
-            this.pendingWord = word;
-            this.showConfirmation(word);
-          } else {
+
+      handleCardSwipe(startX, endX, word) {
+        const distance = endX - startX;
+        const minSwipeDistance = 50;
+        if (Math.abs(distance) < minSwipeDistance) return;
+
+        this._justSwiped = true;
+        this.gradeCurrentCard(word, distance > 0);
+      }
+
+      gradeCurrentCard(word, correct) {
+        // Animate the card off-screen, then apply the grade once the
+        // animation has had time to play - makes swiping/keyboard grading
+        // feel like a responsive deck of cards instead of an instant
+        // content swap.
+        const cardEl = document.getElementById('current-word-card');
+        if (cardEl) {
+          cardEl.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
+          cardEl.style.transform = correct ? 'translateX(150%) rotate(10deg)' : 'translateX(-150%) rotate(-10deg)';
+          cardEl.style.opacity = '0';
+          cardEl.style.pointerEvents = 'none';
+        }
+
+        setTimeout(() => {
+          if (correct) {
             this.markWordKnown(word);
+          } else {
+            this.markWordUnknown(word);
           }
-        } 
-        // Swipe left (negative distance) = mark as don't know
-        else if (swipeDistance < -minSwipeDistance) {
-          this.markWordUnknown(word);
-        }
+        }, cardEl ? 220 : 0);
       }
-      
-      showConfirmation(word) {
-        const msg = `אתה בטוח שאתה יודע את המילה "<strong>${word.english}</strong>"?`;
-        if (confirm(msg.replace(/<[^>]*>/g, ''))) {
-          this.markWordKnown(word);
-        }
-      }
-      
+
       markWordKnown(word) {
         this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: true };
 
