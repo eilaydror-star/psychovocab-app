@@ -249,6 +249,7 @@
       pauseReadingTimer() {
         if (this.readingTimerInterval) {
           clearInterval(this.readingTimerInterval);
+          this.readingTimerActive = false;
           this.readingTimerPaused = true;
           this.render();
         }
