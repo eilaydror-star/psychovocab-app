@@ -30,6 +30,23 @@ function loginUser(email, password) {
   });
 }
 
+function signInWithGoogle() {
+  return new Promise((resolve, reject) => {
+    if (!firebaseReady) {
+      reject('Firebase not ready');
+      return;
+    }
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider)
+      .then((userCredential) => {
+        setCurrentUser(userCredential.user);
+        resolve(userCredential.user);
+      })
+      .catch((error) => reject(error.message));
+  });
+}
+
 function logoutUser() {
   return new Promise((resolve, reject) => {
     if (!firebaseReady) {

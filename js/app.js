@@ -1002,17 +1002,44 @@
                   </p>
                 </div>
               </div>
-              
+
+              <div style="display: flex; align-items: center; gap: 0.75rem; margin: 1.5rem 0; color: var(--text-secondary); font-size: 0.85rem;">
+                <div style="flex: 1; border-top: 1px solid var(--border-light);"></div>
+                או
+                <div style="flex: 1; border-top: 1px solid var(--border-light);"></div>
+              </div>
+
+              <button onclick="app.handleGoogleSignIn()" style="width: 100%; padding: 0.7rem; background: white; color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem;">
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.16.27-1.7V4.97H.96A9 9 0 000 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+                המשך עם Google
+              </button>
+
+              <div id="google-signin-error" style="color: var(--red); margin-top: 0.75rem; font-size: 0.9rem; display: none; text-align: center;"></div>
+
               <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-secondary); text-align: center;">
                 <button onclick="app.continueWithoutLogin()" style="color: var(--teal); background: none; border: none; cursor: pointer; text-decoration: underline;">המשך ללא כניסה</button>
               </div>
             </div>
           </div>
         `;
-        
+
         appContent.innerHTML = html;
       }
-      
+
+      handleGoogleSignIn() {
+        signInWithGoogle()
+          .then(() => {
+            this.render();
+          })
+          .catch((error) => {
+            const errorEl = document.getElementById('google-signin-error');
+            if (errorEl) {
+              errorEl.textContent = 'שגיאה בכניסה עם Google: ' + error;
+              errorEl.style.display = 'block';
+            }
+          });
+      }
+
       toggleAuthForm(e) {
         e.preventDefault();
         const loginForm = document.getElementById('login-form');
@@ -1403,15 +1430,21 @@
             
             <!-- Resources Button -->
             <button class="btn btn-primary" onclick="app.showReadingResources()" style="width: 100%; margin-top: 1rem;">
-              📖 משאבי קריאה בעברית
+              📖 משאבי קריאה באנגלית
             </button>
             
             ${currentUser ? `
               <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                  <div>
-                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0 0 0.3rem;">המשתמש המחובר</p>
-                    <p style="font-size: 1rem; font-weight: 600; color: var(--dark-navy); margin: 0;">${currentUser.email}</p>
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    ${currentUser.photoURL
+                      ? `<img src="${currentUser.photoURL}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
+                      : `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--sage-green); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1rem; flex-shrink: 0;">${(currentUser.displayName || currentUser.email || '?').charAt(0).toUpperCase()}</div>`
+                    }
+                    <div>
+                      <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0 0 0.2rem;">ברוך הבא</p>
+                      <p style="font-size: 1rem; font-weight: 600; color: var(--dark-navy); margin: 0;">${currentUser.displayName || currentUser.email}</p>
+                    </div>
                   </div>
                   <button onclick="app.logout()" style="padding: 0.5rem 1.25rem; background: var(--red); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
                     ↗ יציאה
