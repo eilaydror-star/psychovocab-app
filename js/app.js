@@ -7,6 +7,9 @@
         this.sessionIndex = 0;
         this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
         this.lastAction = null; // Last grid mark, for undo
+        this.currentStreak = 0; // Consecutive calendar days studied
+        this.sessionsToday = 0; // Sessions started today - encourages multiple short visits, not just one/day
+        this.lastStudyDate = null; // 'YYYY-MM-DD'
         this.lastSaved = null;
         this.autoSaveInterval = null;
         this.currentUser = null; // Firebase user
@@ -59,7 +62,7 @@
       startNewSession() {
         // Filter remaining words by difficulty setting
         let remaining = this.words.filter(w => w.status !== 'green');
-        
+
         // Filter by selected difficulty levels
         remaining = remaining.filter(w => {
           if (w.difficulty === 'easy') return this.difficultyFilter.easy;
@@ -67,20 +70,79 @@
           if (w.difficulty === 'hard') return this.difficultyFilter.hard;
           return true;
         });
-        
+
         if (remaining.length === 0) return;
-        
+
+        // Real spaced repetition: a word you just got right (red -> orange)
+        // rests for a few hours (see markWordKnown) before it's eligible
+        // again, instead of being immediately re-drillable. Only words
+        // that are actually due get selected into a new session.
+        const now = Date.now();
+        const due = remaining.filter(w => w.status === 'red' || !w.dueAt || w.dueAt <= now);
+
+        if (due.length === 0) {
+          this.showRestingModal(remaining);
+          return;
+        }
+
+        this.recordStudySession();
+
         // Session size: exactly 7 words (or less if not enough words available)
-        const sessionSize = Math.min(7, remaining.length);
-        
+        const sessionSize = Math.min(7, due.length);
+
         // Weighted random selection based on test probability
-        const weighted = this.weightedRandomSelection(remaining, sessionSize);
+        const weighted = this.weightedRandomSelection(due, sessionSize);
         this.currentSession = weighted;
-        
+
         this.sessionIndex = 0;
         this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
         this.sessionActive = true;
         this.render();
+      }
+
+      recordStudySession() {
+        // Tracks both a day-level streak (don't break the chain) and a
+        // same-day session count (multiple short visits per day is how
+        // real spaced repetition actually works, not one long daily cram).
+        const today = new Date().toISOString().split('T')[0];
+
+        if (this.lastStudyDate === today) {
+          this.sessionsToday++;
+          return;
+        }
+
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        this.currentStreak = (this.lastStudyDate === yesterday) ? this.currentStreak + 1 : 1;
+        this.lastStudyDate = today;
+        this.sessionsToday = 1;
+      }
+
+      showRestingModal(restingWords) {
+        const now = Date.now();
+        const nextDueAt = Math.min(...restingWords.map(w => w.dueAt || now));
+        const msRemaining = Math.max(0, nextDueAt - now);
+        const minutesRemaining = Math.ceil(msRemaining / 60000);
+        const hours = Math.floor(minutesRemaining / 60);
+        const mins = minutesRemaining % 60;
+        const timeText = hours > 0
+          ? `${hours} שעות${mins > 0 ? ' ו-' + mins + ' דקות' : ''}`
+          : `${mins} דקות`;
+
+        const content = `
+          <div style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+            <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">
+              עשית את החלק שלך להיום! ענית נכון על כל המילים הזמינות כרגע.
+            </p>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+              כדי שהמילים באמת ייקלטו בזיכרון לטווח ארוך, הן צריכות מנוחה לפני שתתבקש לאשר אותן שוב.
+            </p>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
+              <strong>המנה הבאה תהיה מוכנה בעוד ${timeText}</strong>
+            </div>
+          </div>
+        `;
+        this.showModal('🎯 מעולה, חזור מאוחר יותר', content);
       }
       
       weightedRandomSelection(words, count) {
@@ -513,10 +575,11 @@
         // Revert the last markWordKnown/markWordUnknown action
         if (!this.lastAction) return;
 
-        const { word, prevStatus, prevStreak, prevUpdatedAt, wasCorrect } = this.lastAction;
+        const { word, prevStatus, prevStreak, prevUpdatedAt, prevDueAt, wasCorrect } = this.lastAction;
         word.status = prevStatus;
         word.streak = prevStreak;
         word.updatedAt = prevUpdatedAt;
+        word.dueAt = prevDueAt;
 
         if (wasCorrect) {
           this.sessionStats.correct = Math.max(0, this.sessionStats.correct - 1);
@@ -555,6 +618,9 @@
           levelProgression: this.levelProgression,
           currentLevel: this.currentLevel,
           unlockedLevels: this.unlockedLevels,
+          currentStreak: this.currentStreak,
+          sessionsToday: this.sessionsToday,
+          lastStudyDate: this.lastStudyDate,
           lastSaved: new Date().toISOString()
         };
         if (saveToLocalStorage(state)) {
@@ -600,6 +666,7 @@
                 localWord.status = remoteWord.status;
                 localWord.streak = remoteWord.streak;
                 localWord.association = remoteWord.association;
+                localWord.dueAt = remoteWord.dueAt;
                 localWord.updatedAt = remoteWord.updatedAt;
               }
             });
@@ -607,6 +674,9 @@
             const progressData = {
               words: this.words,
               allTimeStats: this.allTimeStats,
+              currentStreak: this.currentStreak,
+              sessionsToday: this.sessionsToday,
+              lastStudyDate: this.lastStudyDate,
               lastSaved: new Date().toISOString(),
               lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
             };
@@ -655,12 +725,16 @@
                   word.status = saved.status;
                   word.streak = saved.streak;
                   word.association = saved.association;
+                  word.dueAt = saved.dueAt;
                   word.updatedAt = saved.updatedAt;
                 }
               });
 
               this.words = freshWords;
               this.allTimeStats = data.allTimeStats || this.allTimeStats;
+              this.currentStreak = data.currentStreak ?? this.currentStreak;
+              this.sessionsToday = data.sessionsToday ?? this.sessionsToday;
+              this.lastStudyDate = data.lastStudyDate ?? this.lastStudyDate;
               this.render();
             } else {
               console.log('No Firebase progress found, using local');
@@ -690,25 +764,30 @@
             const savedStatusMap = {};
             if (savedWords && Array.isArray(savedWords)) {
               savedWords.forEach(w => {
-                savedStatusMap[w.id] = { status: w.status, streak: w.streak, association: w.association };
+                savedStatusMap[w.id] = { status: w.status, streak: w.streak, association: w.association, dueAt: w.dueAt, updatedAt: w.updatedAt };
               });
             }
-            
+
             // Apply saved progress to fresh words
             freshWords.forEach(word => {
               if (savedStatusMap[word.id]) {
                 word.status = savedStatusMap[word.id].status;
                 word.streak = savedStatusMap[word.id].streak;
                 word.association = savedStatusMap[word.id].association;
+                word.dueAt = savedStatusMap[word.id].dueAt;
+                word.updatedAt = savedStatusMap[word.id].updatedAt;
               }
             });
-            
+
             this.words = freshWords; // Use fresh words array
             this.allTimeStats = data.allTimeStats;
             this.difficultyFilter = data.difficultyFilter || { easy: true, moderate: true, hard: true };
             this.levelProgression = data.levelProgression || 'free';
             this.currentLevel = data.currentLevel || 'easy';
             this.unlockedLevels = data.unlockedLevels || { easy: true, moderate: false, hard: false };
+            this.currentStreak = data.currentStreak || 0;
+            this.sessionsToday = data.sessionsToday || 0;
+            this.lastStudyDate = data.lastStudyDate || null;
             this.showLevelSelector = false;
             this.lastSaved = data.lastSaved ? new Date(data.lastSaved) : null;
         }
@@ -929,6 +1008,8 @@
         
         document.getElementById('total-mastered').textContent = stats.mastered;
         document.getElementById('total-remaining').textContent = stats.remaining;
+        document.getElementById('current-streak').textContent = this.currentStreak;
+        document.getElementById('sessions-today').textContent = this.sessionsToday;
         
         // Show level selector if first time or user resets
         if (this.showLevelSelector) {
@@ -1460,14 +1541,19 @@
       }
       
       renderSession(appContent) {
-        // Filter out mastered words (status = 'green')
-        const activeWords = this.currentSession.filter(w => w.status !== 'green');
-        
+        // Filter out mastered words (status = 'green') and words now
+        // resting after a correct first answer (real spaced repetition -
+        // see markWordKnown/startNewSession).
+        const now = Date.now();
+        const activeWords = this.currentSession.filter(w =>
+          w.status !== 'green' && (w.status === 'red' || !w.dueAt || w.dueAt <= now)
+        );
+
         if (activeWords.length === 0) {
           this.renderSessionEnd(appContent);
           return;
         }
-        
+
         const masteredCount = this.currentSession.filter(w => w.status === 'green').length;
         const overallStats = this.getStats();
         
@@ -1620,17 +1706,21 @@
       }
       
       markWordKnown(word) {
-        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, wasCorrect: true };
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: true };
 
         // Progress the word's status
         if (!word.status || word.status === 'red') {
-          // First time: red -> orange
+          // First time: red -> orange. Rest for ~4 hours before it's
+          // eligible for a confirmation round again - real spaced
+          // repetition, not an instant re-drill.
           word.status = 'orange';
           word.streak = 1;
+          word.dueAt = Date.now() + 4 * 60 * 60 * 1000;
         } else if (word.status === 'orange') {
-          // Second time: orange -> green (mastered)
+          // Second correct answer, after resting - now mastered.
           word.status = 'green';
           word.streak = 2;
+          word.dueAt = null;
 
           // Structured mode: unlock the next level once every word in the
           // current level is mastered.
@@ -1652,13 +1742,15 @@
       }
 
       markWordUnknown(word) {
-        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, wasCorrect: false };
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: false };
 
         // User swiped LEFT (doesn't know)
         if (word.status === 'orange') {
-          // If was orange, go back to red (forgot it)
+          // If was orange, go back to red (forgot it) - due immediately,
+          // no rest period for a word you just got wrong.
           word.status = 'red';
           word.streak = 0;
+          word.dueAt = null;
         }
         // If already red, stay red (no change)
         word.updatedAt = Date.now();
