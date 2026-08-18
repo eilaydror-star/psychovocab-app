@@ -512,9 +512,10 @@
         // Revert the last markWordKnown/markWordUnknown action
         if (!this.lastAction) return;
 
-        const { word, prevStatus, prevStreak, wasCorrect } = this.lastAction;
+        const { word, prevStatus, prevStreak, prevUpdatedAt, wasCorrect } = this.lastAction;
         word.status = prevStatus;
         word.streak = prevStreak;
+        word.updatedAt = prevUpdatedAt;
 
         if (wasCorrect) {
           this.sessionStats.correct = Math.max(0, this.sessionStats.correct - 1);
@@ -534,6 +535,7 @@
         const word = this.words.find(w => w.id === wordId);
         if (word) {
           word.association = value;
+          word.updatedAt = Date.now();
           this.saveProgress();
         }
       }
@@ -577,14 +579,39 @@
         }
 
         const userProgressRef = db.ref(`users/${currentUser.uid}/progress`);
-        const progressData = {
-          words: this.words,
-          allTimeStats: this.allTimeStats,
-          lastSaved: new Date().toISOString(),
-          lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
-        };
 
-        userProgressRef.set(progressData)
+        // Read the cloud copy first and merge per-word by updatedAt, instead
+        // of blindly overwriting it. Without this, two devices open at the
+        // same time (or one device with a stale in-memory copy) would have
+        // whichever one saves last silently erase the other's progress on
+        // words it never even touched.
+        userProgressRef.once('value')
+          .then((snapshot) => {
+            const remoteWords = snapshot.exists() ? (snapshot.val().words || []) : [];
+            const remoteMap = {};
+            remoteWords.forEach(w => { remoteMap[w.id] = w; });
+
+            this.words.forEach(localWord => {
+              const remoteWord = remoteMap[localWord.id];
+              if (remoteWord && (remoteWord.updatedAt || 0) > (localWord.updatedAt || 0)) {
+                // The cloud has a newer change for this word (made on
+                // another device) - take it instead of overwriting it.
+                localWord.status = remoteWord.status;
+                localWord.streak = remoteWord.streak;
+                localWord.association = remoteWord.association;
+                localWord.updatedAt = remoteWord.updatedAt;
+              }
+            });
+
+            const progressData = {
+              words: this.words,
+              allTimeStats: this.allTimeStats,
+              lastSaved: new Date().toISOString(),
+              lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            return userProgressRef.set(progressData);
+          })
           .then(() => {
             console.log('Progress synced to Firebase');
           })
@@ -609,23 +636,28 @@
               const data = snapshot.val();
               console.log('Loaded progress from Firebase');
               
-              // Merge saved progress with fresh words
+              // Merge saved progress with fresh words - only take the cloud
+              // value for a word if it's not older than what's already
+              // loaded locally (matters if this fires after local changes
+              // were already made this session, e.g. re-auth mid-session).
               const savedWords = data.words || [];
               const freshWords = this.words;
-              
-              const savedStatusMap = {};
+
+              const savedMap = {};
               savedWords.forEach(w => {
-                savedStatusMap[w.id] = { status: w.status, streak: w.streak, association: w.association };
+                savedMap[w.id] = w;
               });
-              
+
               freshWords.forEach(word => {
-                if (savedStatusMap[word.id]) {
-                  word.status = savedStatusMap[word.id].status;
-                  word.streak = savedStatusMap[word.id].streak;
-                  word.association = savedStatusMap[word.id].association;
+                const saved = savedMap[word.id];
+                if (saved && (saved.updatedAt || 0) >= (word.updatedAt || 0)) {
+                  word.status = saved.status;
+                  word.streak = saved.streak;
+                  word.association = saved.association;
+                  word.updatedAt = saved.updatedAt;
                 }
               });
-              
+
               this.words = freshWords;
               this.allTimeStats = data.allTimeStats || this.allTimeStats;
               this.render();
@@ -866,65 +898,6 @@
         this.showModal('🚦 מערכת הרמזור - איך זה עובד?', content);
       }
       
-      
-      showAssociationModal(wordId) {
-        const word = this.words.find(w => w.id === wordId);
-        if (!word) return;
-        
-        const modalBody = document.getElementById('modal-body');
-        
-        const content = `
-          <div style="margin-bottom: 1.5rem;">
-            <div style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
-              ${word.english}
-            </div>
-            <div style="color: var(--teal); font-size: 1rem;">
-              ${word.hebrew}
-            </div>
-          </div>
-          
-          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-            💡 צור קשר אישי כדי לזכור את המילה הזו. היה יצירתי!
-          </p>
-          
-          <div class="textarea-wrapper">
-            <textarea id="association-input" placeholder="e.g., 'A-BIGUOUS = A big guess (sounds ambiguous!)' or 'Benevolent Ben gives to the poor...'">${word.association || ''}</textarea>
-            <div class="char-count">
-              <span id="char-count">0</span>/500 תווים
-            </div>
-          </div>
-        `;
-        
-        document.getElementById('modal-title').textContent = '📝 Add Memory Association';
-        modalBody.innerHTML = content;
-        
-        document.getElementById('modal-overlay').style.display = 'flex';
-        
-        // Set up character counter
-        const textarea = document.getElementById('association-input');
-        textarea.addEventListener('input', (e) => {
-          document.getElementById('char-count').textContent = e.target.value.length;
-        });
-        
-        // Initialize character count
-        document.getElementById('char-count').textContent = word.association ? word.association.length : 0;
-        
-        // Focus on textarea
-        setTimeout(() => textarea.focus(), 0);
-      }
-      
-      saveAssociation(wordId) {
-        const word = this.words.find(w => w.id === wordId);
-        if (!word) return;
-        
-        const textarea = document.getElementById('association-input');
-        if (textarea) {
-          word.association = textarea.value.substring(0, 500);
-          this.saveState();
-          this.closeModal();
-          this.render();
-        }
-      }
       
       resetAllData() {
         this.words = this.initializeWords();
@@ -1613,7 +1586,7 @@
       }
       
       markWordKnown(word) {
-        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, wasCorrect: true };
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, wasCorrect: true };
 
         // Progress the word's status
         if (!word.status || word.status === 'red') {
@@ -1635,6 +1608,7 @@
             }
           }
         }
+        word.updatedAt = Date.now();
 
         this.sessionStats.correct++;
         this.allTimeStats.totalAttempts++;
@@ -1644,7 +1618,7 @@
       }
 
       markWordUnknown(word) {
-        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, wasCorrect: false };
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, wasCorrect: false };
 
         // User swiped LEFT (doesn't know)
         if (word.status === 'orange') {
@@ -1653,6 +1627,7 @@
           word.streak = 0;
         }
         // If already red, stay red (no change)
+        word.updatedAt = Date.now();
 
         this.sessionStats.incorrect++;
         this.allTimeStats.totalAttempts++;
