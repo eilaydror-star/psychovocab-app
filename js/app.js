@@ -57,7 +57,11 @@
       }
       
       initializeWords() {
-        return WORDS_DATA.map(w => ({ ...w }));
+        // dueAt/flagged default to explicit null/false (not just a missing
+        // key) - Firebase's set() rejects any value containing `undefined`
+        // anywhere in the object tree, so every word needs a real value
+        // from the start rather than relying on the key being absent.
+        return WORDS_DATA.map(w => ({ ...w, dueAt: null, flagged: false, updatedAt: null }));
       }
       
       startNewSession() {
@@ -514,7 +518,31 @@
         
         this.showModal('📚 משאבי קריאה באנגלית', content);
       }
-      
+
+      showFeedbackModal() {
+        const content = `
+          <div style="line-height: 1.8;">
+            <p style="margin-bottom: 1rem;">
+              תודה שאתה משתמש באפליקציה! 🙏
+            </p>
+            <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+              זו הגרסה הראשונה (v1) של האפליקציה, ואני עדיין עובד על שיפורה. אם נתקלת בבאג, בתרגום שלא מדויק, או שיש לך רעיון לשיפור - אשמח מאוד לשמוע על כך.
+            </p>
+            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+              אפשר לסמן מילה עם 🚩 ישירות בזמן השינון אם משהו לא נראה נכון, או פשוט לשלוח לי מייל.
+            </p>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light); text-align: center; margin-bottom: 1.5rem;">
+              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.3rem;">יצירת קשר</div>
+              <a href="mailto:eilaydror@gmail.com" style="color: var(--sage-green); font-weight: 600; text-decoration: none; font-size: 1.05rem;">eilaydror@gmail.com</a>
+            </div>
+            <p style="text-align: center; font-weight: 500;">
+              בהצלחה במבחן - פסיכומטרי או אמירם, מה שרלוונטי אליך. אתה תצליח! 💪
+            </p>
+          </div>
+        `;
+        this.showModal('💌 משוב ויצירת קשר', content);
+      }
+
       handleKeyboard(e) {
         // Ignore if typing in textarea
         if (document.activeElement.tagName === 'TEXTAREA') {
@@ -581,8 +609,8 @@
         const { word, prevStatus, prevStreak, prevUpdatedAt, prevDueAt, wasCorrect } = this.lastAction;
         word.status = prevStatus;
         word.streak = prevStreak;
-        word.updatedAt = prevUpdatedAt;
-        word.dueAt = prevDueAt;
+        word.updatedAt = prevUpdatedAt ?? null;
+        word.dueAt = prevDueAt ?? null;
 
         if (wasCorrect) {
           this.sessionStats.correct = Math.max(0, this.sessionStats.correct - 1);
@@ -669,8 +697,9 @@
                 localWord.status = remoteWord.status;
                 localWord.streak = remoteWord.streak;
                 localWord.association = remoteWord.association;
-                localWord.dueAt = remoteWord.dueAt;
-                localWord.updatedAt = remoteWord.updatedAt;
+                localWord.dueAt = remoteWord.dueAt ?? null;
+                localWord.flagged = remoteWord.flagged ?? false;
+                localWord.updatedAt = remoteWord.updatedAt ?? null;
               }
             });
 
@@ -728,8 +757,9 @@
                   word.status = saved.status;
                   word.streak = saved.streak;
                   word.association = saved.association;
-                  word.dueAt = saved.dueAt;
-                  word.updatedAt = saved.updatedAt;
+                  word.dueAt = saved.dueAt ?? null;
+                  word.flagged = saved.flagged ?? false;
+                  word.updatedAt = saved.updatedAt ?? null;
                 }
               });
 
@@ -767,7 +797,7 @@
             const savedStatusMap = {};
             if (savedWords && Array.isArray(savedWords)) {
               savedWords.forEach(w => {
-                savedStatusMap[w.id] = { status: w.status, streak: w.streak, association: w.association, dueAt: w.dueAt, updatedAt: w.updatedAt };
+                savedStatusMap[w.id] = { status: w.status, streak: w.streak, association: w.association, dueAt: w.dueAt, flagged: w.flagged, updatedAt: w.updatedAt };
               });
             }
 
@@ -777,8 +807,9 @@
                 word.status = savedStatusMap[word.id].status;
                 word.streak = savedStatusMap[word.id].streak;
                 word.association = savedStatusMap[word.id].association;
-                word.dueAt = savedStatusMap[word.id].dueAt;
-                word.updatedAt = savedStatusMap[word.id].updatedAt;
+                word.dueAt = savedStatusMap[word.id].dueAt ?? null;
+                word.flagged = savedStatusMap[word.id].flagged ?? false;
+                word.updatedAt = savedStatusMap[word.id].updatedAt ?? null;
               }
             });
 
@@ -1568,7 +1599,15 @@
             <button class="btn btn-primary" onclick="app.showReadingResources()" style="width: 100%; margin-top: 1rem;">
               📖 משאבי קריאה באנגלית
             </button>
-            
+
+            <button class="btn btn-secondary" onclick="app.showFeedbackModal()" style="width: 100%; margin-top: 0.75rem;">
+              💌 משוב ויצירת קשר
+            </button>
+
+            <button class="btn btn-secondary" onclick="app.showFlaggedWordsModal()" style="width: 100%; margin-top: 0.75rem;">
+              🚩 מילים שסימנתי${this.words.filter(w => w.flagged).length > 0 ? ` (${this.words.filter(w => w.flagged).length})` : ''}
+            </button>
+
             ${currentUser ? `
               <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -1635,6 +1674,11 @@
               <div id="note-field-wrapper" style="display: none; margin-top: 1rem;" onclick="event.stopPropagation()">
                 <textarea id="assoc-${word.id}" placeholder="💭 כתוב דרך להיזכר..." style="width: 100%; padding: 0.6rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 2px; min-height: 60px;" onchange="window.app.updateAssociation(${word.id}, this.value)">${word.association || ''}</textarea>
               </div>
+              <div>
+                <button onclick="event.stopPropagation(); app.toggleFlag(${word.id})" style="margin-top: 0.75rem; background: none; border: none; color: ${word.flagged ? 'var(--red)' : 'var(--text-secondary)'}; cursor: pointer; font-size: 0.8rem;">
+                  🚩 ${word.flagged ? 'סומן לבדיקה - לחץ לביטול' : 'התרגום לא נראה נכון?'}
+                </button>
+              </div>
             </div>
 
             <div class="swipe-hint">
@@ -1679,6 +1723,47 @@
           const textarea = document.getElementById('assoc-' + wordId);
           if (textarea) setTimeout(() => textarea.focus(), 0);
         }
+      }
+
+      toggleFlag(wordId) {
+        // Lets a user mark a word whose translation looks wrong/off, so it
+        // can be reviewed and fixed later - this is a v1 word list, some
+        // entries are bound to need a second look.
+        const word = this.words.find(w => w.id === wordId);
+        if (!word) return;
+        word.flagged = !word.flagged;
+        word.updatedAt = Date.now();
+        this.saveProgress();
+        this.render();
+      }
+
+      showFlaggedWordsModal() {
+        const flagged = this.words.filter(w => w.flagged);
+        let content;
+        if (flagged.length === 0) {
+          content = `
+            <p style="text-align: center; color: var(--text-secondary);">
+              לא סימנת עדיין אף מילה. אם תיתקל בתרגום שנראה לא נכון בזמן השינון, אפשר לסמן אותו עם 🚩 כדי שאבדוק אותו.
+            </p>
+          `;
+        } else {
+          content = `
+            <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+              המילים האלה סומנו כדי שאבדוק אותן. אפשר לבטל סימון בכל רגע.
+            </p>
+            <div style="max-height: 50vh; overflow-y: auto;">
+              ${flagged.map(w => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light); gap: 0.75rem;">
+                  <div>
+                    <strong>${w.english}</strong> - ${w.hebrew}
+                  </div>
+                  <button onclick="app.toggleFlag(${w.id}); app.showFlaggedWordsModal();" class="btn btn-sm btn-secondary" style="flex-shrink: 0;">בטל סימון</button>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+        this.showModal('🚩 מילים שסומנו', content);
       }
 
       setupCardSwipeDetection(element, word) {
