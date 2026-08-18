@@ -204,7 +204,7 @@
             <p style="margin-bottom: 1.5rem;">
               עכשיו אתה יכול ללמוד מילים <strong>${levelNames[level]}</strong>
             </p>
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <strong>💡 טיפ:</strong> הקשו יותר קשה!
             </div>
             <button class="btn btn-primary" onclick="app.closeModal(); app.switchLevel('${level}')">
@@ -330,7 +330,7 @@
             <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">
               עבודה נהדרת! קראת מספיק ספרים באנגלית היום. 📚
             </p>
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <strong>💡 טיפ:</strong> כל יום קריאה משפרת את הצפנון שלך!
             </div>
             <button class="btn btn-primary" onclick="app.closeModal()">
@@ -349,7 +349,7 @@
             
             <div style="margin-bottom: 2rem;">
               <h4 style="color: #51CF66; margin-bottom: 1rem;">🟢 קל - ספרים שכיחים ופשוטים</h4>
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 Project Gutenberg</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   אתר בחינם עם אלפי ספרים קלאסיים - התחל עם "Alice in Wonderland"
@@ -359,7 +359,7 @@
                 </a>
               </div>
               
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 BBC Learning English</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   סיפורים קצרים וקלים עם שמע
@@ -369,7 +369,7 @@
                 </a>
               </div>
               
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px;">
                 <strong>📖 Wattpad - Young Adult</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   סיפורים משתמשים קלים בשפה פשוטה
@@ -382,7 +382,7 @@
             
             <div style="margin-bottom: 2rem;">
               <h4 style="color: #FFA500; margin-bottom: 1rem;">🟡 בינוני - ספרים בעלי מורכבות בינונית</h4>
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 Penguin Classics - Abridged</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   ספרים קלאסיים מקוצרים ללימוד יעיל
@@ -392,7 +392,7 @@
                 </a>
               </div>
               
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 Oxford Bookworms</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   ספרים עם מילים חיוניות מחדש
@@ -402,7 +402,7 @@
                 </a>
               </div>
               
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px;">
                 <strong>📖 Medium - Popular Articles</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   מאמרים באנגלית על נושאים בעלי עניין
@@ -415,7 +415,7 @@
             
             <div>
               <h4 style="color: #FF6B6B; margin-bottom: 1rem;">🔴 קשה - ספרים קשים ומעמיקים</h4>
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 The New York Times - Opinion</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   מאמרי דעה מורכבים על נושאים מדיניים
@@ -425,7 +425,7 @@
                 </a>
               </div>
               
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 The Economist</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   מגזין עסקי וכלכלי בעל שפה מדויקת
@@ -435,7 +435,7 @@
                 </a>
               </div>
               
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px;">
                 <strong>📖 Scientific American</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
                   מאמרים מדעיים עמוקים עם טרמינולוגיה מדויקת
@@ -821,7 +821,7 @@
         const content = `
           <div style="max-height: 70vh; overflow-y: auto; direction: rtl;">
             <!-- Hebrew Explanation Only -->
-            <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
+            <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
               <h3 style="color: var(--teal); margin-top: 0; margin-bottom: 1rem;">🧠 מערכת הרמזור - איך זה עובד?</h3>
               
               <p style="margin-bottom: 1rem; line-height: 1.8; color: var(--text-secondary);">
@@ -836,7 +836,7 @@
             
             <p style="margin-bottom: 1rem; line-height: 1.8;">כל מילה עוברת דרך שלושה שלבים עד שהיא נשלטת לחלוטין:</p>
             
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 1rem;">
                 <strong style="color: #FF6B6B;">🟥 אדום - חדש או טעויות</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.3rem;">המילה חדשה או קיבלת אותה בטעות. צריך ללמוד מחדש!</p>
@@ -857,7 +857,7 @@
             
             <p style="margin-bottom: 1rem; line-height: 1.8;">המערכת משתמשת במדע הוכח: חזרה משכללת משפרת זיכרון לטווח ארוך.</p>
             
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 1rem; font-size: 0.95rem;">
                 <strong>📍 שלב 1:</strong> למדת מילה → רואה אותה שוב בעוד שעות
               </div>
@@ -871,7 +871,7 @@
             
             <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">⏰ לוח זמנים תיאורטי</h3>
             
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem;">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem; font-size: 0.9rem;">
               <div style="margin-bottom: 0.8rem;"><strong>09:00 בבוקר:</strong> למדת "Ambitious" (אדום 🟥)</div>
               <div style="margin-bottom: 0.8rem;"><strong>11:00 בבוקר:</strong> ענית נכון (כתום 🟧)</div>
               <div style="margin-bottom: 0.8rem;"><strong>15:00 אחר הצהריים:</strong> ענית נכון שוב (ירוק 🟩 שולט!)</div>
@@ -880,7 +880,7 @@
             
             <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">💡 טיפים להצלחה</h3>
             
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 0.8rem;">✅ עשה שיעורים מרובים ביום להחזקת הזיכרון</div>
               <div style="margin-bottom: 0.8rem;">✅ הוסף קשרים אישיים (לחץ 📝) כדי לזכור טוב יותר</div>
               <div style="margin-bottom: 0.8rem;">✅ אל תדלג על ימים - הזיכרון זקוק לחזרה סדירה</div>
@@ -889,7 +889,7 @@
             
             <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">🎯 מטרה סופית</h3>
             
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-light);">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
               <p style="margin: 0;">בעזרת שיעורים קבועים וחזרה משכללת, תשלוט בכל 3,500 המילים! הכל תלוי בעקביות וקשב. בהצלחה! 🚀</p>
             </div>
           </div>
@@ -944,10 +944,10 @@
       renderLoginScreen(appContent) {
         let html = `
           <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;">
-            <div style="background: white; border-radius: 16px; padding: 2rem; border: 1px solid var(--border-light); max-width: 400px; width: 100%;">
+            <div style="background: var(--bg-card); border-radius: 2px; padding: 2.5rem 2rem; border: 1px solid var(--border-light); border-top: 3px solid var(--gold-accent); max-width: 400px; width: 100%;">
               <div style="text-align: center; margin-bottom: 2rem;">
                 <div style="font-size: 2.5rem; margin-bottom: 1rem;">📚</div>
-                <h1 style="font-size: 1.8rem; font-weight: 600; color: var(--dark-navy); margin: 0 0 0.5rem;">PsychoVocab</h1>
+                <h1 style="font-family: var(--font-display); font-size: 2.3rem; font-weight: 500; letter-spacing: 0.5px; color: var(--dark-navy); margin: 0 0 0.5rem;">PsychoVocab</h1>
                 <p style="color: var(--text-secondary); margin: 0;">הכנה פסיכומטרית עם שמירת התקדמות</p>
               </div>
               
@@ -958,17 +958,17 @@
                   
                   <div style="margin-bottom: 1rem;">
                     <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
-                    <input type="email" id="login-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                    <input type="email" id="login-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
                   
                   <div style="margin-bottom: 1.5rem;">
                     <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה</label>
-                    <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                    <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
                   
                   <div id="login-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
                   
-                  <button onclick="app.handleLogin()" style="width: 100%; padding: 0.75rem; background: var(--sage-green); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
+                  <button onclick="app.handleLogin()" style="width: 100%; padding: 0.75rem; background: var(--sage-green); color: white; border: none; border-radius: 2px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
                     כניסה
                   </button>
                   
@@ -983,17 +983,17 @@
                   
                   <div style="margin-bottom: 1rem;">
                     <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
-                    <input type="email" id="register-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                    <input type="email" id="register-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
                   
                   <div style="margin-bottom: 1rem;">
                     <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה (לפחות 6 תווים)</label>
-                    <input type="password" id="register-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; font-size: 1rem;">
+                    <input type="password" id="register-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
                   
                   <div id="register-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
                   
-                  <button onclick="app.handleRegister()" style="width: 100%; padding: 0.75rem; background: var(--sage-green); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
+                  <button onclick="app.handleRegister()" style="width: 100%; padding: 0.75rem; background: var(--sage-green); color: white; border: none; border-radius: 2px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
                     הרשמה
                   </button>
                   
@@ -1009,7 +1009,7 @@
                 <div style="flex: 1; border-top: 1px solid var(--border-light);"></div>
               </div>
 
-              <button onclick="app.handleGoogleSignIn()" style="width: 100%; padding: 0.7rem; background: white; color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 8px; font-size: 0.95rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem;">
+              <button onclick="app.handleGoogleSignIn()" style="width: 100%; padding: 0.7rem; background: white; color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 2px; font-size: 0.95rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem;">
                 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.16.27-1.7V4.97H.96A9 9 0 000 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
                 המשך עם Google
               </button>
@@ -1189,7 +1189,7 @@
               </button>
             </div>
             
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-light);">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
               <strong>💡 המלצה:</strong> אם אתה מתחיל, בחר בהתקדמות מובנית או בחירה חופשית.
             </div>
           </div>
@@ -1221,7 +1221,7 @@
         const hardCount = this.words.filter(w => w.difficulty === 'hard').length;
         
         html += `
-          <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
+          <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
             <div style="font-weight: 600; margin-bottom: 1rem; text-align: center; color: var(--sage-green);">
               🎯 בחר רמות קושי לשינון
             </div>
@@ -1300,7 +1300,7 @@
               אנחנו משתמשים במערכת מתמטית שהוכחה שמשפרת את הזיכרון לטווח ארוך:
             </p>
             
-            <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
+            <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 1rem;">
                 <strong>📍 שלב 1 (אדום - חדש):</strong>
                 <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">
@@ -1329,7 +1329,7 @@
               <strong>דוגמה תיאורטית ללמידת מילה חדשה:</strong>
             </p>
             
-            <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 12px;">
+            <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 2px;">
               <div style="display: grid; gap: 1rem;">
                 <div>
                   <strong style="color: var(--teal);">09:00 בבוקר:</strong> למדת מילה חדשה "Ambitious" → 🟥 אדום
@@ -1348,7 +1348,7 @@
             
             <h3 style="margin-top: 2rem;">💡 טיפים לשלמות</h3>
             
-            <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
+            <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <ul style="list-style: none; padding: 0;">
                 <li style="margin-bottom: 1rem;">✅ <strong>עשה שיעורים מרובים ביום:</strong> תחזק את הזיכרון שלך</li>
                 <li style="margin-bottom: 1rem;">✅ <strong>הוסף קשרים אישיים:</strong> לחץ על 📝 להוסיף זיכרון עזר</li>
@@ -1421,7 +1421,7 @@
               
               <!-- Custom Timer Input -->
               <div style="margin-top: 1rem; display: flex; gap: 0.8rem;">
-                <input type="number" id="custom-timer-input" placeholder="הכנס דקות" min="1" max="180" style="flex: 1; padding: 0.75rem; border: 2px solid var(--border-light); border-radius: 8px; font-size: 1rem; text-align: center; direction: rtl;" />
+                <input type="number" id="custom-timer-input" placeholder="הכנס דקות" min="1" max="180" style="flex: 1; padding: 0.75rem; border: 2px solid var(--border-light); border-radius: 2px; font-size: 1rem; text-align: center; direction: rtl;" />
                 <button class="btn btn-primary" onclick="app.startCustomTimer()" style="padding: 0.75rem 1.5rem;">
                   התחל
                 </button>
@@ -1504,7 +1504,7 @@
               <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
                 החליק ימינה כדי לסמן כשידוע | החליק שמאלה אם לא יודע
               </div>
-              <div style="background: var(--bg-light); padding: 1.25rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-secondary);">
+              <div style="background: var(--bg-light); padding: 1.25rem; border-radius: 2px; margin-bottom: 1rem; border: 1px solid var(--border-light); font-size: 0.85rem; color: var(--text-secondary);">
                 → יודע &nbsp;·&nbsp; ← לא יודע &nbsp;·&nbsp; Space גלוי &nbsp;·&nbsp; U ביטול &nbsp;·&nbsp; B חזור
               </div>
               <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
@@ -1681,7 +1681,7 @@
                 שלטת בכל <strong>${totalWords}</strong> מילים בהישיבה זו!
               </p>
               
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center;">
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem; text-align: center;">
                 <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">התקדמות כללית</div>
                 <div style="font-size: 2rem; font-weight: 600; color: var(--teal);">${overallStats.mastered} / 3500</div>
                 <div style="font-size: 0.85rem; color: var(--text-secondary);">מילים שולט</div>

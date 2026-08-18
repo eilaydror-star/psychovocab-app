@@ -1,27 +1,31 @@
 :root {
-  --sage-green: #5B8A7A;
-  --soft-taupe: #9B8B7D;
-  --cream: #F5F1E8;
-  --dark-navy: #2C3E4A;
-  --light-sage: #E8EFE9;
-  --text-primary: #2C3E4A;
-  --text-secondary: #6B7280;
-  --border-light: #D4CCC2;
-  --gold-accent: #C9A876;
-  --red: #E74C3C;
-  --orange: #FFA500;
-  --green: #51CF66;
-  --bg-light: #F9F7F3;
-  --teal: #5B8A7A;
+  /* Luxury nature palette (forest green / cream / gold), inspired by
+     https://www.cielhomes.in/ - deep forest green as the primary accent,
+     warm cream as the base surface, gold reserved for special/luxury
+     touches (mastery, celebrations, dividers). */
+  --sage-green: #4A7A5A;
+  --soft-taupe: #8A9A8E;
+  --cream: #F4EFE4;
+  --dark-navy: #1B3325;
+  --light-sage: #E3EAE4;
+  --text-primary: #1B3325;
+  --text-secondary: #5C6F62;
+  --border-light: #DCE3DD;
+  --gold-accent: #C4A265;
+  --gold-light: #DEC08A;
+  --red: #B85C4F;
+  --orange: #C6893F;
+  --green: #C4A265; /* "mastered" reads as gold, not literal green - fits the achievement/luxury motif */
+  --bg-light: #F4EFE4;
+  --teal: #4A7A5A;
+  --forest-dark: #142A1D;
 
-  /* These were referenced throughout the original stylesheet (streak
-     badges, timer accents, association notes, card backgrounds) but were
-     never defined in :root, so those elements silently rendered with
-     transparent/invalid colors. Filled in to match the app's sage/cream
-     palette. */
   --purple: #8B7FD6;
-  --blue-accent: #00D9FF;
-  --border-color: #E5E5E5;
+  --blue-accent: #4A7A5A;
+  --border-color: #DCE3DD;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F5F1E8;
+  --bg-card-hover: #EFE8D8;
+
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
