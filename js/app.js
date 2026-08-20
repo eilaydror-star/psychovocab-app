@@ -604,7 +604,7 @@
               <a href="mailto:eilaydror@gmail.com" style="color: var(--sage-green); font-weight: 600; text-decoration: none; font-size: 1.05rem;">eilaydror@gmail.com</a>
             </div>
             <p style="text-align: center; font-weight: 500;">
-              בהצלחה במבחן - פסיכומטרי או אמירם, מה שרלוונטי אליך. אתה תצליח! 💪
+              בהצלחה במבחן - פסיכומטרי או אמירנט, מה שרלוונטי אליך. אתה תצליח! 💪
             </p>
           </div>
         `;
