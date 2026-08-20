@@ -1072,6 +1072,16 @@
         event.target.value = '';
       }
       
+      // Any string that came from a Firebase Auth profile (displayName,
+      // email) or another user's data (a friend's publicProfiles entry) is
+      // untrusted input as far as innerHTML is concerned, even though it
+      // looks like plain text most of the time - escape before inserting.
+      escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : String(str);
+        return div.innerHTML;
+      }
+
       showModal(title, content) {
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-body').innerHTML = content;
@@ -1910,13 +1920,13 @@
               <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                   <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    ${currentUser.photoURL
-                      ? `<img src="${currentUser.photoURL}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
-                      : `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--sage-green); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1rem; flex-shrink: 0;">${(currentUser.displayName || currentUser.email || '?').charAt(0).toUpperCase()}</div>`
+                    ${currentUser.photoURL && /^https:\/\//.test(currentUser.photoURL)
+                      ? `<img src="${app.escapeHtml(currentUser.photoURL)}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">`
+                      : `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--sage-green); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1rem; flex-shrink: 0;">${app.escapeHtml((currentUser.displayName || currentUser.email || '?').charAt(0).toUpperCase())}</div>`
                     }
                     <div>
                       <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0 0 0.2rem;">ברוך הבא</p>
-                      <p style="font-size: 1rem; font-weight: 600; color: var(--dark-navy); margin: 0;">${currentUser.displayName || currentUser.email}</p>
+                      <p style="font-size: 1rem; font-weight: 600; color: var(--dark-navy); margin: 0;">${app.escapeHtml(currentUser.displayName || currentUser.email)}</p>
                     </div>
                   </div>
                   <button onclick="app.logout()" style="padding: 0.5rem 1.25rem; background: var(--red); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
@@ -2303,7 +2313,7 @@
             return `
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light);">
                 <div>
-                  <strong>${profile.displayName}</strong>
+                  <strong>${app.escapeHtml(profile.displayName)}</strong>
                   <div style="font-size: 0.8rem; color: var(--text-secondary);">🔥 ${profile.streak || 0} ימים · ✅ ${profile.masteredCount || 0} מילים</div>
                 </div>
                 <button onclick="app.removeFriend('${uid}')" class="btn btn-sm btn-secondary">הסר</button>
