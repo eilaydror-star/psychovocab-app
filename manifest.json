@@ -1,0 +1,25 @@
+{
+  "name": "PsychoVocab",
+  "short_name": "PsychoVocab",
+  "description": "מערכת שינון מילים באנגלית להכנה פסיכומטרית",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F8F4EC",
+  "theme_color": "#4A7A5A",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
