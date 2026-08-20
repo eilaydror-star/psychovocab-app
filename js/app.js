@@ -481,8 +481,6 @@
       showReadingResources() {
         const content = `
           <div style="max-height: 70vh; overflow-y: auto;">
-            <h3 style="color: var(--teal); margin-bottom: 1.5rem; text-align: center;">📚 משאבי קריאה באנגלית</h3>
-            
             <div style="margin-bottom: 2rem;">
               <h4 style="color: #51CF66; margin-bottom: 1rem;">🟢 קל - ספרים שכיחים ופשוטים</h4>
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
@@ -529,12 +527,12 @@
               </div>
               
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
-                <strong>📖 Oxford Bookworms</strong>
+                <strong>📖 News in Levels</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                  ספרים עם מילים חיוניות מחדש
+                  אותה כתבה בשלוש רמות קושי - קל, בינוני, קשה
                 </p>
-                <a href="https://elt.oup.com/student/bookworms" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
-                  ▶ Oxford Bookworms Series
+                <a href="https://www.newsinlevels.com" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ www.newsinlevels.com
                 </a>
               </div>
               
@@ -552,22 +550,22 @@
             <div>
               <h4 style="color: #FF6B6B; margin-bottom: 1rem;">🔴 קשה - ספרים קשים ומעמיקים</h4>
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
-                <strong>📖 The New York Times - Opinion</strong>
+                <strong>📖 The Guardian - Opinion</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                  מאמרי דעה מורכבים על נושאים מדיניים
+                  מאמרי דעה מורכבים על נושאים מדיניים, בחינם וללא חומת תשלום
                 </p>
-                <a href="https://www.nytimes.com/section/opinion" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
-                  ▶ NYT Opinion Section
+                <a href="https://www.theguardian.com/uk/commentisfree" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ The Guardian Opinion
                 </a>
               </div>
-              
+
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
-                <strong>📖 The Economist</strong>
+                <strong>📖 Aeon</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                  מגזין עסקי וכלכלי בעל שפה מדויקת
+                  מאמרים מעמיקים בשפה מדויקת, בחינם וללא חומת תשלום
                 </p>
-                <a href="https://www.economist.com" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
-                  ▶ www.economist.com
+                <a href="https://aeon.co" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ aeon.co
                 </a>
               </div>
               
