@@ -10,6 +10,8 @@
         this.currentStreak = 0; // Consecutive calendar days studied
         this.sessionsToday = 0; // Sessions started today - encourages multiple short visits, not just one/day
         this.lastStudyDate = null; // 'YYYY-MM-DD'
+        this.studyHistory = {}; // 'YYYY-MM-DD' -> sessions count, for the progress activity view
+        this.friends = {}; // friendUid -> true (Firebase users only, see showFriendsModal)
         this.lastSaved = null;
         this.autoSaveInterval = null;
         this.currentUser = null; // Firebase user
@@ -110,6 +112,7 @@
         // same-day session count (multiple short visits per day is how
         // real spaced repetition actually works, not one long daily cram).
         const today = new Date().toISOString().split('T')[0];
+        this.studyHistory[today] = (this.studyHistory[today] || 0) + 1;
 
         if (this.lastStudyDate === today) {
           this.sessionsToday++;
@@ -120,6 +123,35 @@
         this.currentStreak = (this.lastStudyDate === yesterday) ? this.currentStreak + 1 : 1;
         this.lastStudyDate = today;
         this.sessionsToday = 1;
+
+        this.maybeCelebrateStreak();
+      }
+
+      // Celebrates streak milestones with a warm, positive message - never
+      // a "don't break the streak" threat. Research on similar apps found
+      // guilt/anxiety-driven streak messaging is a top reason people quit;
+      // this only ever shows up as a reward, never a warning.
+      maybeCelebrateStreak() {
+        const messages = {
+          3: 'שלושה ימים ברצף - התחלה מצוינת!',
+          7: 'שבוע שלם ברצף! ההתמדה שלך עובדת.',
+          14: 'שבועיים ברצף - את/ה בונה הרגל אמיתי!',
+          30: 'חודש שלם ברצף! זה הישג רציני.',
+          50: '50 ימים ברצף - וואו!',
+          100: '100 ימים ברצף! מטורף, כל הכבוד.',
+          200: '200 ימים ברצף - זה כבר אורח חיים!',
+          365: 'שנה שלמה ברצף. פשוט אגדי. 🏆'
+        };
+        const message = messages[this.currentStreak];
+        if (!message) return;
+
+        this.showModal(
+          `🔥 ${this.currentStreak} ימים ברצף!`,
+          `<div style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+            <p style="font-size: 1.05rem;">${message}</p>
+          </div>`
+        );
       }
 
       showRestingModal(restingWords) {
@@ -156,7 +188,18 @@
         for (const word of words) {
           // Weight: testProbability determines likelihood of being selected
           // Round to create proper weighting
-          const weight = Math.ceil(word.testProbability * 10);
+          let weight = Math.ceil(word.testProbability * 10);
+
+          // Give due orange words (one correct answer away from mastery) a
+          // priority boost over brand-new red words. Finishing an
+          // almost-mastered word is a visible, complete win ("word turned
+          // green") - surfacing those first gives more frequent moments of
+          // real progress instead of always diluting the session with new
+          // material the learner hasn't even seen once yet.
+          if (word.status === 'orange') {
+            weight = Math.ceil(weight * 1.5);
+          }
+
           for (let i = 0; i < weight; i++) {
             weighted.push(word);
           }
@@ -556,7 +599,7 @@
         if (e.key === 'ArrowRight') {
           e.preventDefault();
           const word = this.getCurrentSessionWord();
-          if (word) this.gradeCurrentCard(word, true);
+          if (word) this.attemptGradeKnown(word);
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault();
           const word = this.getCurrentSessionWord();
@@ -589,7 +632,29 @@
         const hintEl = document.getElementById('toggle-hint');
         if (!hebrewEl) return;
         hebrewEl.classList.toggle('hidden');
-        if (hintEl) hintEl.style.display = hebrewEl.classList.contains('hidden') ? 'block' : 'none';
+        const isHidden = hebrewEl.classList.contains('hidden');
+        if (hintEl) hintEl.style.display = isHidden ? 'block' : 'none';
+        if (!isHidden) this._revealed = true;
+      }
+
+      // Swiping/pressing "know" only grades the card once the learner has
+      // actually seen the translation - the first attempt just reveals it
+      // (so they can check themselves), the second one confirms the grade.
+      // This stops "know" swipes from being a reflex that skips verification.
+      attemptGradeKnown(word) {
+        if (this._revealed) {
+          this.gradeCurrentCard(word, true);
+          return;
+        }
+        const hebrewEl = document.getElementById('hebrew-word');
+        const hintEl = document.getElementById('toggle-hint');
+        if (hebrewEl) hebrewEl.classList.remove('hidden');
+        if (hintEl) {
+          hintEl.textContent = 'עכשיו כשראית את התרגום - החלק שוב ימינה לאישור שאתה יודע';
+          hintEl.style.display = 'block';
+          hintEl.style.color = 'var(--sage-green)';
+        }
+        this._revealed = true;
       }
 
       goBack() {
@@ -606,11 +671,21 @@
         // Revert the last markWordKnown/markWordUnknown action
         if (!this.lastAction) return;
 
-        const { word, prevStatus, prevStreak, prevUpdatedAt, prevDueAt, wasCorrect } = this.lastAction;
+        const { word, prevStatus, prevStreak, prevUpdatedAt, prevDueAt, wasCorrect, prevIndex } = this.lastAction;
         word.status = prevStatus;
         word.streak = prevStreak;
         word.updatedAt = prevUpdatedAt ?? null;
         word.dueAt = prevDueAt ?? null;
+
+        // If the word had been requeued to the back of the session (a
+        // missed word), put it back where it was.
+        if (typeof prevIndex === 'number' && prevIndex !== -1) {
+          const idx = this.currentSession.indexOf(word);
+          if (idx !== -1) {
+            this.currentSession.splice(idx, 1);
+            this.currentSession.splice(prevIndex, 0, word);
+          }
+        }
 
         if (wasCorrect) {
           this.sessionStats.correct = Math.max(0, this.sessionStats.correct - 1);
@@ -634,6 +709,63 @@
           this.saveProgress();
         }
       }
+
+      // Fills the note field with a generated memory-aid suggestion, then
+      // saves it like any manually-typed association - the field stays a
+      // normal free-text textarea, this just gives it a starting point.
+      suggestAssociation(wordId) {
+        const word = this.words.find(w => w.id === wordId);
+        if (!word) return;
+        const suggestion = this.generateAssociationSuggestion(word);
+        const textarea = document.getElementById('assoc-' + wordId);
+        if (textarea) {
+          textarea.value = suggestion;
+          textarea.focus();
+        }
+        this.updateAssociation(wordId, suggestion);
+      }
+
+      generateAssociationSuggestion(word) {
+        const phonetic = this.transliterateToHebrew(word.english);
+        const templates = [
+          `אפשר לנסות לקרוא את המילה כאילו היא כתובה בעברית: "${phonetic}" - ולקשר את ההגייה הזו למשמעות: "${word.hebrew}".`,
+          `תחשוב על ההגייה "${phonetic}" ותדמיין תמונה מוזרה שמקשרת בין הצליל הזה לבין "${word.hebrew}" - ככל שהתמונה מוזרה יותר, כך קל יותר לזכור.`,
+          `נסה לפרק את המילה לצלילים: "${phonetic}", ולבנות משפט קצר וזכיר שמחבר בין הצליל הזה למשמעות "${word.hebrew}".`
+        ];
+        return templates[word.id % templates.length];
+      }
+
+      // Rough letter-by-letter English-to-Hebrew phonetic approximation -
+      // not linguistically precise, just enough to give the learner a
+      // "sounds like" hook for the mnemonic templates above.
+      transliterateToHebrew(englishWord) {
+        const multiChar = [
+          ['tion', 'שן'], ['sion', 'ז׳ן'], ['sh', 'ש'], ['ch', 'צ'], ['th', 'ת'],
+          ['ph', 'פ'], ['ck', 'ק'], ['qu', 'קו'], ['oo', 'ו'], ['ee', 'י'],
+          ['ea', 'י'], ['ou', 'אאו'], ['ai', 'אי'], ['ay', 'אי'], ['ng', 'נג']
+        ];
+        const singleChar = {
+          a: 'א', b: 'ב', c: 'ק', d: 'ד', e: 'א', f: 'פ', g: 'ג', h: 'ה',
+          i: 'אי', j: 'ג׳', k: 'ק', l: 'ל', m: 'מ', n: 'נ', o: 'או', p: 'פ',
+          q: 'ק', r: 'ר', s: 'ס', t: 'ת', u: 'או', v: 'ו', w: 'ו', x: 'קס',
+          y: 'י', z: 'ז'
+        };
+        const word = englishWord.toLowerCase();
+        let result = '';
+        let i = 0;
+        while (i < word.length) {
+          const rest = word.slice(i);
+          const match = multiChar.find(([seq]) => rest.startsWith(seq));
+          if (match) {
+            result += match[1];
+            i += match[0].length;
+          } else {
+            result += singleChar[word[i]] || '';
+            i++;
+          }
+        }
+        return result;
+      }
       
       getStats() {
         const mastered = this.words.filter(w => w.status === 'green').length;
@@ -652,6 +784,7 @@
           currentStreak: this.currentStreak,
           sessionsToday: this.sessionsToday,
           lastStudyDate: this.lastStudyDate,
+          studyHistory: this.studyHistory,
           lastSaved: new Date().toISOString()
         };
         if (saveToLocalStorage(state)) {
@@ -709,6 +842,7 @@
               currentStreak: this.currentStreak,
               sessionsToday: this.sessionsToday,
               lastStudyDate: this.lastStudyDate,
+              studyHistory: this.studyHistory,
               lastSaved: new Date().toISOString(),
               lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
             };
@@ -717,11 +851,31 @@
           })
           .then(() => {
             console.log('Progress synced to Firebase');
+            this.updatePublicProfile();
           })
           .catch((error) => {
             console.warn('Firebase sync failed, using localStorage:', error.message);
             this.saveState(); // Fallback to localStorage
           });
+      }
+
+      // Publishes just the stats needed for the friends feature (never
+      // per-word progress) to a path any signed-in user can read - lets a
+      // friend see your streak/mastered count without exposing your full
+      // word-by-word progress. Requires a Firebase security rule allowing
+      // authenticated reads on `publicProfiles/{uid}` - see showFriendsModal.
+      updatePublicProfile() {
+        if (!firebaseReady || !currentUser) return;
+        const stats = this.getStats();
+        db.ref(`publicProfiles/${currentUser.uid}`).set({
+          displayName: currentUser.displayName || (currentUser.email || 'תלמיד').split('@')[0],
+          streak: this.currentStreak,
+          sessionsToday: this.sessionsToday,
+          masteredCount: stats.mastered,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP
+        }).catch((error) => {
+          console.warn('Could not update public profile:', error.message);
+        });
       }
 
       loadProgressFromFirebase() {
@@ -768,15 +922,28 @@
               this.currentStreak = data.currentStreak ?? this.currentStreak;
               this.sessionsToday = data.sessionsToday ?? this.sessionsToday;
               this.lastStudyDate = data.lastStudyDate ?? this.lastStudyDate;
+              this.studyHistory = data.studyHistory ?? this.studyHistory;
               this.render();
             } else {
               console.log('No Firebase progress found, using local');
               this.loadProgressFromLocalStorage();
             }
+            this.loadFriends();
           })
           .catch((error) => {
             console.warn('Failed to load from Firebase:', error.message);
             this.loadProgressFromLocalStorage();
+          });
+      }
+
+      loadFriends() {
+        if (!firebaseReady || !currentUser) return;
+        db.ref(`users/${currentUser.uid}/friends`).once('value')
+          .then((snapshot) => {
+            this.friends = snapshot.exists() ? snapshot.val() : {};
+          })
+          .catch((error) => {
+            console.warn('Could not load friends list:', error.message);
           });
       }
 
@@ -822,6 +989,7 @@
             this.currentStreak = data.currentStreak || 0;
             this.sessionsToday = data.sessionsToday || 0;
             this.lastStudyDate = data.lastStudyDate || null;
+            this.studyHistory = data.studyHistory || {};
             this.showLevelSelector = false;
             this.lastSaved = data.lastSaved ? new Date(data.lastSaved) : null;
         }
@@ -1104,8 +1272,88 @@
         } else {
           this.renderSession(appContent);
         }
-        
+
         this.setupModalClose();
+        this.maybeShowTutorial();
+      }
+
+      // Auto-shows the beginner's guide exactly once per device, the first
+      // time a new user reaches the level-selector/start screen (never
+      // mid-session, so it can't interrupt a drill in progress). Uses its
+      // own localStorage key, deliberately not synced through
+      // saveState/Firebase - "have I seen the tutorial" is a per-device UI
+      // fact, not learning progress.
+      maybeShowTutorial() {
+        if (this._tutorialCheckDone || this.sessionActive) return;
+        this._tutorialCheckDone = true;
+        try {
+          if (!localStorage.getItem('psychovocab_tutorial_seen')) {
+            localStorage.setItem('psychovocab_tutorial_seen', '1');
+            this.showTutorialModal();
+          }
+        } catch (e) {
+          // localStorage unavailable (e.g. private browsing) - just skip
+          // the auto-popup, the manual "מדריך למתחילים" button still works.
+        }
+      }
+
+      showTutorialModal() {
+        const content = `
+          <div style="max-height: 70vh; overflow-y: auto; direction: rtl;">
+            <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
+              <h3 style="color: var(--teal); margin-top: 0; margin-bottom: 0.75rem;">👋 ברוך הבא!</h3>
+              <p style="margin: 0; line-height: 1.8; color: var(--text-secondary);">
+                האפליקציה מלמדת אותך מילים באנגלית לפסיכומטרי, מילה אחת בכל פעם, עם חזרה חכמה שמתאימה את עצמה לכל מילה. הנה איך זה עובד:
+              </p>
+            </div>
+
+            <h3 style="color: var(--teal); margin-bottom: 0.75rem;">🃏 הכרטיס</h3>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
+              <div style="margin-bottom: 0.8rem;">1️⃣ תראה מילה באנגלית. נסה לזכור את התרגום <strong>לפני</strong> שאתה חושף אותו.</div>
+              <div style="margin-bottom: 0.8rem;">2️⃣ לחץ/הקש על הכרטיס (או Space) כדי לחשוף את התרגום ולבדוק את עצמך.</div>
+              <div>3️⃣ עכשיו סמן אם ידעת - זה הצעד שבאמת קובע את ההתקדמות שלך.</div>
+            </div>
+
+            <h3 style="color: var(--teal); margin-bottom: 0.75rem;">👉👈 החלקה - איך מסמנים</h3>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
+              <div style="margin-bottom: 0.8rem;">
+                <strong style="color: #51CF66;">➡️ ימינה = ״ידעתי״.</strong>
+                <span style="color: var(--text-secondary);"> אם עוד לא ראית את התרגום, ההחלקה הראשונה רק תחשוף אותו (בדיוק כמו לחיצה) - זה כדי שלא תסמן ״ידעתי״ בטעות בלי לבדוק. החלק ימינה שוב כדי לאשר.</span>
+              </div>
+              <div>
+                <strong style="color: #FF6B6B;">⬅️ שמאלה = ״לא ידעתי״.</strong>
+                <span style="color: var(--text-secondary);"> מסמן מיד, בלי צורך לחשוף קודם. המילה תחזור אליך שוב בהמשך אותו שיעור, לא תיעלם.</span>
+              </div>
+              <div style="margin-top: 0.8rem; font-size: 0.85rem; color: var(--text-secondary);">
+                🔘 לא בא לך להחליק? מתחת לכרטיס יש גם כפתורים עגולים ✓ מכיר / ✕ לא מכיר שעושים בדיוק אותו דבר.
+              </div>
+              <div style="margin-top: 0.4rem; font-size: 0.85rem; color: var(--text-secondary);">
+                💻 במחשב: אפשר גם עם החצים ← →, ו-Space לחשיפה.
+              </div>
+            </div>
+
+            <h3 style="color: var(--teal); margin-bottom: 0.75rem;">🚦 הצבעים</h3>
+            <p style="margin-bottom: 1rem; line-height: 1.8; color: var(--text-secondary);">
+              כל מילה עוברת 🟥 אדום (חדשה) → 🟧 כתום (זכרת פעם) → 🟩 ירוק (זכרת פעמיים ברצף - שולט!). ההסבר המלא נמצא בכפתור ״מערכת הרמזור״ בתפריט הראשי.
+            </p>
+
+            <h3 style="color: var(--teal); margin-bottom: 0.75rem;">🛠️ כלים בכרטיס</h3>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
+              <div style="margin-bottom: 0.8rem;">📝 <strong>הוסף רמז אישי</strong> - כתוב דרך לזכור את המילה, או לחץ ״הצע לי אסוציאציה״ לקבל רעיון אוטומטי.</div>
+              <div style="margin-bottom: 0.8rem;">🚩 <strong>סימון תרגום שגוי</strong> - אם תרגום נראה לא נכון, סמן אותו כדי שנבדוק אותו.</div>
+              <div>↶ <strong>ביטול</strong> - טעית בהחלקה? כפתור הביטול (או מקש U) מחזיר את הסימון האחרון.</div>
+            </div>
+
+            <h3 style="color: var(--teal); margin-bottom: 0.75rem;">📅 איך ללמוד נכון</h3>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
+              <div style="margin-bottom: 0.8rem;">✅ עדיף כמה שיעורים קצרים ביום מאשר שיעור ארוך אחד - זה מה שה-🔥 רצף וה-🎯 שיעורים היום בראש המסך עוקבים אחריו.</div>
+              <div style="margin-bottom: 0.8rem;">✅ בתפריט הראשי אפשר לבחור רמת קושי (קל/בינוני/קשה) ומצב לימוד - חופשי או התקדמות מובנית.</div>
+              <div>✅ ההתקדמות נשמרת אוטומטית במכשיר, ואם תתחבר עם חשבון - גם מסתנכרנת בין מכשירים.</div>
+            </div>
+          </div>
+        `;
+
+        this.showModal('🧭 מדריך למתחילים', content);
       }
       
       renderLoginScreen(appContent) {
@@ -1356,12 +1604,16 @@
               </button>
             </div>
             
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light); margin-bottom: 1rem;">
               <strong>💡 המלצה:</strong> אם אתה מתחיל, בחר בהתקדמות מובנית או בחירה חופשית.
             </div>
+
+            <button class="btn btn-secondary" onclick="app.showTutorialModal()" style="width: 100%;">
+              🧭 מדריך למתחילים - איך משתמשים באפליקציה?
+            </button>
           </div>
         `;
-        
+
         appContent.innerHTML = html;
       }
       
@@ -1431,7 +1683,10 @@
         }
         
         html += `
-          <div class="save-controls">
+          <div class="save-controls" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+            <button class="btn btn-secondary" onclick="app.showTutorialModal()">
+              🧭 מדריך למתחילים
+            </button>
             <button class="btn btn-secondary" onclick="app.showHelpModal()">
               ℹ️ מערכת הרמזור - איך זה עובד?
             </button>
@@ -1528,7 +1783,7 @@
           <div class="mastery-section">
             <div class="mastery-title">🎯 כלל השולט</div>
             <div class="mastery-description">
-              מילה נשלטת לחלוטין והוסרה מהתור הפעיל לאחר שענו נכון <strong>3 פעמים ברציפות</strong>. שמור על ההישג חי!
+              מילה נשלטת לחלוטין והוסרה מהתור הפעיל לאחר שענו נכון <strong>פעמיים ברציפות</strong>. שמור על ההישג חי!
             </div>
           </div>
           
@@ -1600,9 +1855,21 @@
               📖 משאבי קריאה באנגלית
             </button>
 
+            <button class="btn btn-secondary" onclick="app.showProgressModal()" style="width: 100%; margin-top: 0.75rem;">
+              📈 ההתקדמות שלי
+            </button>
+
+            <button class="btn btn-secondary" onclick="app.showFriendsModal()" style="width: 100%; margin-top: 0.75rem;">
+              👥 חברים
+            </button>
+
             <button class="btn btn-secondary" onclick="app.showFeedbackModal()" style="width: 100%; margin-top: 0.75rem;">
               💌 משוב ויצירת קשר
             </button>
+
+            <div style="text-align: center; margin-top: 1.5rem;">
+              <img src="assets/logo.png" alt="Logo" style="width: 100px; height: auto; display: inline-block;">
+            </div>
 
             <button class="btn btn-secondary" onclick="app.showFlaggedWordsModal()" style="width: 100%; margin-top: 0.75rem;">
               🚩 מילים שסימנתי${this.words.filter(w => w.flagged).length > 0 ? ` (${this.words.filter(w => w.flagged).length})` : ''}
@@ -1652,6 +1919,14 @@
         // about which card keyboard/swipe actions apply to.
         const word = activeWords[0];
 
+        // Only reset the "has the learner actually seen the translation"
+        // flag when a genuinely new word comes on screen - a re-render of
+        // the same card (e.g. toggling the flag) shouldn't wipe it out.
+        if (this._revealedForWordId !== word.id) {
+          this._revealed = false;
+          this._revealedForWordId = word.id;
+        }
+
         let html = `
           <div class="session-container">
             <div style="text-align: center; margin-bottom: 1.5rem;">
@@ -1669,10 +1944,13 @@
               <div class="hebrew-translation hidden" id="hebrew-word">${word.hebrew}</div>
               <div id="toggle-hint" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">לחץ לגילוי התרגום</div>
               <button onclick="event.stopPropagation(); app.toggleNoteField(${word.id})" style="margin-top: 1.5rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">
-                📝 ${word.association ? 'ערוך רמז אישי' : 'הוסף רמז אישי'}
+                📝 ${word.association ? 'ערוך רמז אישי' : 'הוסף רמז אישי - אסוציאציה מומלצת'}
               </button>
               <div id="note-field-wrapper" style="display: none; margin-top: 1rem;" onclick="event.stopPropagation()">
-                <textarea id="assoc-${word.id}" placeholder="💭 כתוב דרך להיזכר..." style="width: 100%; padding: 0.6rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 2px; min-height: 60px;" onchange="window.app.updateAssociation(${word.id}, this.value)">${word.association || ''}</textarea>
+                <button onclick="app.suggestAssociation(${word.id})" type="button" style="margin-bottom: 0.6rem; background: var(--light-sage); border: 1px solid rgba(74, 122, 90, 0.25); color: var(--sage-green); cursor: pointer; font-size: 0.8rem; padding: 0.5rem 0.9rem; border-radius: 10px; font-weight: 500;">
+                  💡 הצע לי אסוציאציה
+                </button>
+                <textarea id="assoc-${word.id}" placeholder="💭 כתוב דרך להיזכר, או לחץ למעלה לקבלת הצעה..." style="width: 100%; padding: 0.6rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 10px; min-height: 60px;" onchange="window.app.updateAssociation(${word.id}, this.value)">${word.association || ''}</textarea>
               </div>
               <div>
                 <button onclick="event.stopPropagation(); app.toggleFlag(${word.id})" style="margin-top: 0.75rem; background: none; border: none; color: ${word.flagged ? 'var(--red)' : 'var(--text-secondary)'}; cursor: pointer; font-size: 0.8rem;">
@@ -1682,8 +1960,19 @@
             </div>
 
             <div class="swipe-hint">
-              <div class="swipe-direction incorrect"><span class="arrow">←</span> לא יודע</div>
-              <div class="swipe-direction correct">יודע <span class="arrow">→</span></div>
+              <div class="swipe-direction incorrect"><span class="arrow">←</span> תחליקו שמאלה - לא יודע</div>
+              <div class="swipe-direction correct">תחליקו ימינה - יודע <span class="arrow">→</span></div>
+            </div>
+
+            <div class="grade-buttons">
+              <button class="grade-circle-btn dont-know" onclick="app.gradeCurrentCard(app.getCurrentSessionWord(), false)">
+                <span class="grade-circle">✕</span>
+                <span class="grade-label">לא מכיר</span>
+              </button>
+              <button class="grade-circle-btn know" onclick="app.attemptGradeKnown(app.getCurrentSessionWord())">
+                <span class="grade-circle">✓</span>
+                <span class="grade-label">מכיר</span>
+              </button>
             </div>
 
             <div style="text-align: center; margin-top: 1.5rem;">
@@ -1766,6 +2055,193 @@
         this.showModal('🚩 מילים שסומנו', content);
       }
 
+      showProgressModal() {
+        const difficulties = [
+          { key: 'easy', label: '🟢 קל' },
+          { key: 'moderate', label: '🟡 בינוני' },
+          { key: 'hard', label: '🔴 קשה' }
+        ];
+
+        const breakdownHtml = difficulties.map(d => {
+          const words = this.words.filter(w => w.difficulty === d.key);
+          const total = words.length;
+          const green = words.filter(w => w.status === 'green').length;
+          const orange = words.filter(w => w.status === 'orange').length;
+          const red = total - green - orange;
+          const pct = total > 0 ? Math.round((green / total) * 100) : 0;
+          return `
+            <div style="margin-bottom: 1.1rem;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.35rem;">
+                <span>${d.label}</span>
+                <span style="color: var(--text-secondary);">${green}/${total} שולט (${pct}%)</span>
+              </div>
+              <div style="display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--light-sage);">
+                <div style="width: ${total ? (green / total) * 100 : 0}%; background: var(--green);"></div>
+                <div style="width: ${total ? (orange / total) * 100 : 0}%; background: var(--orange);"></div>
+                <div style="width: ${total ? (red / total) * 100 : 0}%; background: var(--red);"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Last 14 days of study activity, from studyHistory (date -> session count).
+        const days = [];
+        for (let i = 13; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+          const key = d.toISOString().split('T')[0];
+          days.push({ count: this.studyHistory[key] || 0, label: d.toLocaleDateString('he-IL', { weekday: 'short' }) });
+        }
+        const maxCount = Math.max(1, ...days.map(d => d.count));
+
+        const heatmapHtml = `
+          <div style="display: flex; gap: 0.3rem; align-items: flex-end; height: 70px;">
+            ${days.map(d => {
+              const heightPct = d.count > 0 ? Math.max(15, (d.count / maxCount) * 100) : 6;
+              const bg = d.count > 0 ? 'var(--sage-green)' : 'var(--border-light)';
+              return `<div style="flex: 1; height: ${heightPct}%; background: ${bg}; border-radius: 3px;" title="${d.count} שיעורים"></div>`;
+            }).join('')}
+          </div>
+          <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem;">
+            ${days.map(d => `<div style="flex: 1; text-align: center; font-size: 0.65rem; color: var(--text-secondary);">${d.label}</div>`).join('')}
+          </div>
+        `;
+
+        const totalMastered = this.words.filter(w => w.status === 'green').length;
+
+        const content = `
+          <div>
+            <p style="margin-bottom: 1.5rem; color: var(--text-secondary); text-align: center;">
+              עד עכשיו שלטת ב-${totalMastered} מילים מתוך ${this.words.length}. כל התקדמות נספרת! 💪
+            </p>
+            <h4 style="margin-bottom: 0.75rem; font-weight: 600;">📊 שליטה לפי רמת קושי</h4>
+            ${breakdownHtml}
+            <h4 style="margin: 1.25rem 0 0.5rem; font-weight: 600;">📅 פעילות ב-14 הימים האחרונים</h4>
+            ${heatmapHtml}
+          </div>
+        `;
+
+        this.showModal('📈 ההתקדמות שלי', content);
+      }
+
+      // Lightweight friend/social feature: users add each other by sharing
+      // their Firebase uid as a "code" (no email lookup needed - that would
+      // require a backend function we don't have). Only aggregate public
+      // stats are exposed via publicProfiles/{uid}, never per-word progress.
+      // Requires the Firebase RTDB security rules below to be added in the
+      // Firebase console:
+      //
+      // "publicProfiles": {
+      //   "$uid": { ".read": "auth != null", ".write": "$uid === auth.uid" }
+      // },
+      // "users": {
+      //   "$uid": {
+      //     "friends": { ".read": "$uid === auth.uid", ".write": "$uid === auth.uid" }
+      //   }
+      // }
+      showFriendsModal() {
+        if (!firebaseReady || !currentUser) {
+          this.showModal('👥 חברים', `
+            <p style="text-align: center; color: var(--text-secondary);">
+              כדי להוסיף חברים ולהשוות רצפים, צריך להתחבר עם חשבון (לא במצב "המשך ללא כניסה").
+            </p>
+          `);
+          return;
+        }
+
+        const content = `
+          <div>
+            <p style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">הקוד שלך לשיתוף - שלח לחבר כדי שיוסיף אותך:</p>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem;">
+              <input id="my-friend-code" type="text" readonly value="${currentUser.uid}" style="flex: 1; padding: 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-light); border-radius: 8px; direction: ltr; text-align: left; background: var(--bg-light);">
+              <button class="btn btn-sm btn-secondary" onclick="app.copyFriendCode()">העתק</button>
+            </div>
+
+            <p style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">הוסף חבר לפי הקוד שקיבלת ממנו:</p>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+              <input id="add-friend-code" type="text" placeholder="הדבק קוד חבר..." style="flex: 1; padding: 0.5rem; font-size: 0.8rem; border: 1px solid var(--border-light); border-radius: 8px; direction: ltr; text-align: left;">
+              <button class="btn btn-sm btn-primary" onclick="app.addFriendByCode()">הוסף</button>
+            </div>
+
+            <div id="friends-list-container">
+              <p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">טוען חברים...</p>
+            </div>
+          </div>
+        `;
+        this.showModal('👥 חברים', content);
+        this.renderFriendsList();
+      }
+
+      copyFriendCode() {
+        const input = document.getElementById('my-friend-code');
+        if (!input) return;
+        input.select();
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(input.value).catch(() => {});
+        }
+      }
+
+      addFriendByCode() {
+        const input = document.getElementById('add-friend-code');
+        if (!input) return;
+        const code = input.value.trim();
+        if (!code || code === currentUser.uid) {
+          input.value = '';
+          return;
+        }
+        this.friends[code] = true;
+        db.ref(`users/${currentUser.uid}/friends/${code}`).set(true).catch((error) => {
+          console.warn('Could not save friend:', error.message);
+        });
+        input.value = '';
+        this.renderFriendsList();
+      }
+
+      removeFriend(friendUid) {
+        delete this.friends[friendUid];
+        db.ref(`users/${currentUser.uid}/friends/${friendUid}`).remove().catch((error) => {
+          console.warn('Could not remove friend:', error.message);
+        });
+        this.renderFriendsList();
+      }
+
+      renderFriendsList() {
+        const container = document.getElementById('friends-list-container');
+        if (!container) return;
+
+        const friendIds = Object.keys(this.friends);
+        if (friendIds.length === 0) {
+          container.innerHTML = `<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">עדיין אין לך חברים מחוברים. שתף את הקוד שלך כדי להתחיל!</p>`;
+          return;
+        }
+
+        Promise.all(friendIds.map(uid =>
+          db.ref(`publicProfiles/${uid}`).once('value').then(snap => ({ uid, profile: snap.exists() ? snap.val() : null }))
+        )).then(results => {
+          container.innerHTML = results.map(({ uid, profile }) => {
+            if (!profile) {
+              return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light);">
+                  <span style="color: var(--text-secondary); font-size: 0.85rem;">חבר לא נמצא</span>
+                  <button onclick="app.removeFriend('${uid}')" class="btn btn-sm btn-secondary">הסר</button>
+                </div>
+              `;
+            }
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light);">
+                <div>
+                  <strong>${profile.displayName}</strong>
+                  <div style="font-size: 0.8rem; color: var(--text-secondary);">🔥 ${profile.streak || 0} ימים · ✅ ${profile.masteredCount || 0} מילים</div>
+                </div>
+                <button onclick="app.removeFriend('${uid}')" class="btn btn-sm btn-secondary">הסר</button>
+              </div>
+            `;
+          }).join('');
+        }).catch((error) => {
+          container.innerHTML = `<p style="text-align: center; color: var(--red); font-size: 0.85rem;">שגיאה בטעינת חברים.</p>`;
+          console.warn('Could not load friend profiles:', error.message);
+        });
+      }
+
       setupCardSwipeDetection(element, word) {
         let touchStartX = 0;
 
@@ -1805,7 +2281,11 @@
         if (Math.abs(distance) < minSwipeDistance) return;
 
         this._justSwiped = true;
-        this.gradeCurrentCard(word, distance > 0);
+        if (distance > 0) {
+          this.attemptGradeKnown(word);
+        } else {
+          this.gradeCurrentCard(word, false);
+        }
       }
 
       gradeCurrentCard(word, correct) {
@@ -1867,7 +2347,8 @@
       }
 
       markWordUnknown(word) {
-        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: false };
+        const prevIndex = this.currentSession.indexOf(word);
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: false, prevIndex };
 
         // User swiped LEFT (doesn't know)
         if (word.status === 'orange') {
@@ -1880,6 +2361,15 @@
         // If already red, stay red (no change)
         word.updatedAt = Date.now();
 
+        // Send the missed word to the back of this session's queue instead
+        // of leaving it at the front - otherwise it would immediately come
+        // back up as the next card. It still resurfaces later in the same
+        // set, just after other words get a turn.
+        if (prevIndex !== -1) {
+          this.currentSession.splice(prevIndex, 1);
+          this.currentSession.push(word);
+        }
+
         this.sessionStats.incorrect++;
         this.allTimeStats.totalAttempts++;
         this.saveProgress();
@@ -1889,16 +2379,29 @@
       renderSessionEnd(appContent) {
         const totalWords = this.currentSession.length;
         const overallStats = this.getStats();
-        
+
+        // Most sessions end with words resting (answered correctly once,
+        // now waiting ~4h before their confirmation round) rather than
+        // fully mastered (green) - saying "mastered" here would directly
+        // contradict the traffic-light explanation shown elsewhere in the
+        // app, so the summary must reflect which of the two actually happened.
+        const masteredInSession = this.currentSession.filter(w => w.status === 'green').length;
+        const restingInSession = totalWords - masteredInSession;
+        const summaryText = restingInSession === 0
+          ? `שלטת בכל <strong>${totalWords}</strong> מילים בהישיבה זו! 🎉`
+          : masteredInSession === 0
+            ? `סיימת סבב על <strong>${totalWords}</strong> מילים! הן ינוחו כמה שעות ואז יחזרו לאישור סופי.`
+            : `שלטת ב-<strong>${masteredInSession}</strong> מילים, ועוד <strong>${restingInSession}</strong> נמצאות בדרך - ינוחו כמה שעות ואז יחזרו לאישור סופי.`;
+
         let html = `
           <div class="session-container">
             <div class="session-end">
               <div class="session-end-title">שיעור הושלם! 🎉</div>
-              
+
               <p style="color: var(--text-secondary); margin-bottom: 1.5rem; text-align: center;">
-                שלטת בכל <strong>${totalWords}</strong> מילים בהישיבה זו!
+                ${summaryText}
               </p>
-              
+
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem; text-align: center;">
                 <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">התקדמות כללית</div>
                 <div style="font-size: 2rem; font-weight: 600; color: var(--teal);">${overallStats.mastered} / 3500</div>

@@ -1,13 +1,13 @@
 .word-card {
   background: var(--bg-card);
   border: 1px solid var(--border-light);
-  border-radius: 2px;
+  border-radius: 20px;
   padding: 3rem 2rem;
   margin-bottom: 2rem;
   text-align: center;
   position: relative;
-  box-shadow: none;
-  transition: none;
+  box-shadow: 0 10px 30px rgba(20, 42, 29, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   cursor: pointer;
   max-width: 600px;
   margin-left: auto;
@@ -17,8 +17,8 @@
 
 .word-card:hover {
   border-color: var(--gold-accent);
-  box-shadow: none;
-  transform: none;
+  box-shadow: 0 14px 36px rgba(20, 42, 29, 0.12);
+  transform: translateY(-2px);
 }
 
 .grid-word-card {
@@ -384,7 +384,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   margin-top: 1.5rem;
   padding: 0;
   background: transparent;
@@ -396,15 +396,98 @@
 .swipe-direction {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   flex: 1;
+  padding: 0.85rem 0.75rem;
+  border-radius: 14px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.swipe-direction.correct { color: var(--green); }
-.swipe-direction.incorrect { color: var(--red); }
+.swipe-direction.correct {
+  color: var(--sage-green);
+  background: var(--light-sage);
+  border-color: rgba(74, 122, 90, 0.25);
+}
+
+.swipe-direction.incorrect {
+  color: var(--red);
+  background: rgba(184, 92, 79, 0.08);
+  border-color: rgba(184, 92, 79, 0.25);
+}
 
 .arrow {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
+}
+
+.grade-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2.5rem;
+  margin-top: 1.5rem;
+}
+
+.grade-circle-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-body);
+}
+
+.grade-circle-btn .grade-circle {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  box-shadow: 0 4px 14px rgba(20, 42, 29, 0.1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.grade-circle-btn:hover .grade-circle {
+  transform: translateY(-2px);
+}
+
+.grade-circle-btn:active .grade-circle {
+  transform: scale(0.94);
+}
+
+.grade-circle-btn.know .grade-circle {
+  color: var(--sage-green);
+  border-color: rgba(74, 122, 90, 0.3);
+}
+
+.grade-circle-btn.know:hover .grade-circle {
+  background: var(--light-sage);
+  box-shadow: 0 8px 20px rgba(74, 122, 90, 0.25);
+}
+
+.grade-circle-btn.dont-know .grade-circle {
+  color: var(--red);
+  border-color: rgba(184, 92, 79, 0.3);
+}
+
+.grade-circle-btn.dont-know:hover .grade-circle {
+  background: rgba(184, 92, 79, 0.08);
+  box-shadow: 0 8px 20px rgba(184, 92, 79, 0.2);
+}
+
+.grade-circle-btn .grade-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .swiping-left {
@@ -419,15 +502,26 @@
 
 .btn {
   border: 1px solid var(--border-light);
-  border-radius: 2px;
+  border-radius: 10px;
   font-weight: 500;
   cursor: pointer;
-  transition: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
   font-size: 0.85rem;
   padding: 0.75rem 1.2rem;
   min-height: 44px;
   background: white;
   letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(20, 42, 29, 0.06);
+}
+
+.btn:hover {
+  box-shadow: 0 4px 14px rgba(20, 42, 29, 0.1);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(20, 42, 29, 0.08);
 }
 
 .btn-primary {
@@ -436,17 +530,19 @@
   border-color: var(--sage-green);
   font-size: 0.9rem;
   padding: 0.7rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(74, 122, 90, 0.28);
 }
 
 .btn-primary:hover {
-  transform: none;
-  box-shadow: none;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(74, 122, 90, 0.34);
   background: var(--forest-dark);
   border-color: var(--forest-dark);
 }
 
 .btn-primary:active {
-  transform: none;
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(74, 122, 90, 0.3);
 }
 
 .btn-secondary {
@@ -457,7 +553,7 @@
 
 .btn-secondary:hover {
   background: var(--light-sage);
-  transform: none;
+  transform: translateY(-1px);
 }
 
 .traffic-light-legend {
@@ -667,7 +763,7 @@
 
 .btn-danger:hover {
   background: rgba(184, 92, 79, 0.06);
-  transform: none;
+  transform: translateY(-1px);
 }
 
 .success-message {
