@@ -149,9 +149,34 @@
           `🔥 ${this.currentStreak} ימים ברצף!`,
           `<div style="text-align: center;">
             <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
-            <p style="font-size: 1.05rem;">${message}</p>
+            <p style="font-size: 1.05rem; margin-bottom: 1.5rem;">${message}</p>
+            <button class="btn btn-secondary" onclick="app.shareApp()">
+              📤 ספר לחבר שגם הוא ישנן
+            </button>
           </div>`
         );
+      }
+
+      // Native share sheet when available (mobile), clipboard-copy fallback
+      // otherwise (desktop browsers without navigator.share) - either way
+      // the user ends up with a ready-to-send message, never a dead end.
+      shareApp() {
+        const url = 'https://eilaydror-star.github.io/psychovocab-app/';
+        const text = 'אני משנן מילים לפסיכומטרי באפליקציה הזאת - חינמית, עם חזרה מרווחת שעובדת. בוא תנסה גם:';
+        if (navigator.share) {
+          navigator.share({ title: 'PsychoVocab', text, url }).catch(() => {});
+          return;
+        }
+        const shareText = `${text} ${url}`;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(shareText).then(() => {
+            this.showModal('📤 שיתוף', '<p style="text-align: center;">ההודעה הועתקה - אפשר להדביק אותה בוואטסאפ או בכל מקום אחר!</p>');
+          }).catch(() => {
+            this.showModal('📤 שיתוף', `<p style="text-align: center; margin-bottom: 1rem;">שלח לחבר:</p><p style="text-align: center; direction: ltr; word-break: break-all;">${url}</p>`);
+          });
+        } else {
+          this.showModal('📤 שיתוף', `<p style="text-align: center; margin-bottom: 1rem;">שלח לחבר:</p><p style="text-align: center; direction: ltr; word-break: break-all;">${url}</p>`);
+        }
       }
 
       showRestingModal(restingWords) {
@@ -1689,6 +1714,9 @@
             </button>
             <button class="btn btn-secondary" onclick="app.showHelpModal()">
               ℹ️ מערכת הרמזור - איך זה עובד?
+            </button>
+            <button class="btn btn-secondary" onclick="app.shareApp()">
+              📤 שתף עם חבר
             </button>
           </div>
         `;
