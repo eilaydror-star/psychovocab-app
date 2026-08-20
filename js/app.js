@@ -135,7 +135,7 @@
         const messages = {
           3: 'שלושה ימים ברצף - התחלה מצוינת!',
           7: 'שבוע שלם ברצף! ההתמדה שלך עובדת.',
-          14: 'שבועיים ברצף - את/ה בונה הרגל אמיתי!',
+          14: 'שבועיים ברצף - אתם בונים הרגל אמיתי!',
           30: 'חודש שלם ברצף! זה הישג רציני.',
           50: '50 ימים ברצף - וואו!',
           100: '100 ימים ברצף! מטורף, כל הכבוד.',
@@ -334,10 +334,10 @@
             <div style="font-size: 3rem; margin-bottom: 1rem;">${levelEmoji[level]}</div>
             <h2 style="color: var(--teal); margin-bottom: 1rem;">רמה חדשה נחשפה!</h2>
             <p style="font-size: 1.2rem; margin-bottom: 1.5rem;">
-              אתה שלטת בכל המילים בהצלחה! 🎉
+              שלטתם בכל המילים בהצלחה! 🎉
             </p>
             <p style="margin-bottom: 1.5rem;">
-              עכשיו אתה יכול ללמוד מילים <strong>${levelNames[level]}</strong>
+              עכשיו אתם יכולים ללמוד מילים <strong>${levelNames[level]}</strong>
             </p>
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <strong>💡 טיפ:</strong> הקשו יותר קשה!
@@ -589,7 +589,7 @@
         const content = `
           <div style="line-height: 1.8;">
             <p style="margin-bottom: 1rem;">
-              תודה שאתה משתמש באפליקציה! 🙏
+              תודה שאתם משתמשים באפליקציה! 🙏
             </p>
             <p style="margin-bottom: 1rem; color: var(--text-secondary);">
               זו הגרסה הראשונה (v1) של האפליקציה, ואני עדיין עובד על שיפורה. אם נתקלת בבאג, בתרגום שלא מדויק, או שיש לך רעיון לשיפור - אשמח מאוד לשמוע על כך.
@@ -602,7 +602,7 @@
               <a href="mailto:eilaydror@gmail.com" style="color: var(--sage-green); font-weight: 600; text-decoration: none; font-size: 1.05rem;">eilaydror@gmail.com</a>
             </div>
             <p style="text-align: center; font-weight: 500;">
-              בהצלחה במבחן - פסיכומטרי או אמירנט, מה שרלוונטי אליך. אתה תצליח! 💪
+              בהצלחה במבחן - פסיכומטרי או אמירנט, מה שרלוונטי אליכם. תצליחו! 💪
             </p>
           </div>
         `;
@@ -673,7 +673,7 @@
         const hintEl = document.getElementById('toggle-hint');
         if (hebrewEl) hebrewEl.classList.remove('hidden');
         if (hintEl) {
-          hintEl.textContent = 'עכשיו כשראית את התרגום - החלק שוב ימינה לאישור שאתה יודע';
+          hintEl.textContent = 'עכשיו כשראיתם את התרגום - החליקו שוב ימינה לאישור שאתם יודעים';
           hintEl.style.display = 'block';
           hintEl.style.color = 'var(--sage-green)';
         }
@@ -1149,7 +1149,7 @@
               
               <div style="margin-bottom: 1rem;">
                 <strong style="color: #FFA500;">🟧 כתום - זכרת פעם אחת</strong>
-                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.3rem;">זכרת את המילה בפעם הראשונה. אתה בדרך הנכונה!</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.3rem;">זכרת את המילה בפעם הראשונה. אתם בדרך הנכונה!</p>
               </div>
               
               <div>
@@ -1326,29 +1326,29 @@
             <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
               <h3 style="color: var(--teal); margin-top: 0; margin-bottom: 0.75rem;">👋 ברוך הבא!</h3>
               <p style="margin: 0; line-height: 1.8; color: var(--text-secondary);">
-                האפליקציה מלמדת אותך מילים באנגלית לפסיכומטרי, מילה אחת בכל פעם, עם חזרה חכמה שמתאימה את עצמה לכל מילה. הנה איך זה עובד:
+                האפליקציה מלמדת אתכם מילים באנגלית לפסיכומטרי, מילה אחת בכל פעם, עם חזרה חכמה שמתאימה את עצמה לכל מילה. הנה איך זה עובד:
               </p>
             </div>
 
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">🃏 הכרטיס</h3>
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
-              <div style="margin-bottom: 0.8rem;">1️⃣ תראה מילה באנגלית. נסה לזכור את התרגום <strong>לפני</strong> שאתה חושף אותו.</div>
-              <div style="margin-bottom: 0.8rem;">2️⃣ לחץ/הקש על הכרטיס (או Space) כדי לחשוף את התרגום ולבדוק את עצמך.</div>
-              <div>3️⃣ עכשיו סמן אם ידעת - זה הצעד שבאמת קובע את ההתקדמות שלך.</div>
+              <div style="margin-bottom: 0.8rem;">1️⃣ תראו מילה באנגלית. נסו לזכור את התרגום <strong>לפני</strong> שאתם חושפים אותו.</div>
+              <div style="margin-bottom: 0.8rem;">2️⃣ לחצו/הקישו על הכרטיס (או Space) כדי לחשוף את התרגום ולבדוק את עצמכם.</div>
+              <div>3️⃣ עכשיו סמנו אם ידעתם - זה הצעד שבאמת קובע את ההתקדמות שלכם.</div>
             </div>
 
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">👉👈 החלקה - איך מסמנים</h3>
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 0.8rem;">
                 <strong style="color: #51CF66;">➡️ ימינה = ״ידעתי״.</strong>
-                <span style="color: var(--text-secondary);"> אם עוד לא ראית את התרגום, ההחלקה הראשונה רק תחשוף אותו (בדיוק כמו לחיצה) - זה כדי שלא תסמן ״ידעתי״ בטעות בלי לבדוק. החלק ימינה שוב כדי לאשר.</span>
+                <span style="color: var(--text-secondary);"> אם עוד לא ראיתם את התרגום, ההחלקה הראשונה רק תחשוף אותו (בדיוק כמו לחיצה) - זה כדי שלא תסמנו ״ידעתי״ בטעות בלי לבדוק. תחליקו ימינה שוב כדי לאשר.</span>
               </div>
               <div>
                 <strong style="color: #FF6B6B;">⬅️ שמאלה = ״לא ידעתי״.</strong>
-                <span style="color: var(--text-secondary);"> מסמן מיד, בלי צורך לחשוף קודם. המילה תחזור אליך שוב בהמשך אותו שיעור, לא תיעלם.</span>
+                <span style="color: var(--text-secondary);"> מסמן מיד, בלי צורך לחשוף קודם. המילה תחזור אליכם שוב בהמשך אותו שיעור, לא תיעלם.</span>
               </div>
               <div style="margin-top: 0.8rem; font-size: 0.85rem; color: var(--text-secondary);">
-                🔘 לא בא לך להחליק? מתחת לכרטיס יש גם כפתורים עגולים ✓ מכיר / ✕ לא מכיר שעושים בדיוק אותו דבר.
+                🔘 לא בא לכם להחליק? מתחת לכרטיס יש גם כפתורים עגולים ✓ מכיר / ✕ לא מכיר שעושים בדיוק אותו דבר.
               </div>
               <div style="margin-top: 0.4rem; font-size: 0.85rem; color: var(--text-secondary);">
                 💻 במחשב: אפשר גם עם החצים ← →, ו-Space לחשיפה.
@@ -1357,14 +1357,15 @@
 
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">🚦 הצבעים</h3>
             <p style="margin-bottom: 1rem; line-height: 1.8; color: var(--text-secondary);">
-              כל מילה עוברת 🟥 אדום (חדשה) → 🟧 כתום (זכרת פעם) → 🟩 ירוק (זכרת פעמיים ברצף - שולט!). ההסבר המלא נמצא בכפתור ״מערכת הרמזור״ בתפריט הראשי.
+              כל מילה עוברת 🟥 אדום (חדשה) → 🟧 כתום (זכרתם פעם) → 🟩 ירוק (זכרתם פעמיים ברצף - שולט!). ההסבר המלא נמצא בכפתור ״מערכת הרמזור״ בתפריט הראשי.
             </p>
 
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">🛠️ כלים בכרטיס</h3>
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
-              <div style="margin-bottom: 0.8rem;">📝 <strong>הוסף רמז אישי</strong> - כתוב דרך לזכור את המילה, או לחץ ״הצע לי אסוציאציה״ לקבל רעיון אוטומטי.</div>
-              <div style="margin-bottom: 0.8rem;">🚩 <strong>סימון תרגום שגוי</strong> - אם תרגום נראה לא נכון, סמן אותו כדי שנבדוק אותו.</div>
-              <div>↶ <strong>ביטול</strong> - טעית בהחלקה? כפתור הביטול (או מקש U) מחזיר את הסימון האחרון.</div>
+              <div style="margin-bottom: 0.8rem;">📝 <strong>הוסף רמז אישי</strong> - כתבו דרך לזכור את המילה, או לחצו ״הצע לי אסוציאציה״ לקבל רעיון אוטומטי.</div>
+              <div style="margin-bottom: 0.8rem;">🚩 <strong>סימון תרגום שגוי</strong> - אם תרגום נראה לא נכון, סמנו אותו כדי שנבדוק אותו.</div>
+              <div style="margin-bottom: 0.8rem;">↶ <strong>ביטול</strong> - טעיתם בהחלקה? כפתור הביטול (או מקש U) מחזיר את הסימון האחרון.</div>
+              <div>✅ <strong>מילים ששלטתם בהן</strong> - ברשימת ״מילים ששלטתי בהן״ בתפריט הראשי אפשר לראות את כל המילים הירוקות, ואם אחת מהן בעצם לא ידועה לכם טוב - להחזיר אותה לשינון בלחיצה אחת.</div>
             </div>
 
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">📅 איך ללמוד נכון</h3>
@@ -1578,7 +1579,7 @@
                   🆓 בחר בחופשיות
                 </div>
                 <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  למד כל המילים מכל הרמות בו זמנית. אתה בשליטה מלאה!
+                  לומדים את כל המילים מכל הרמות בו-זמנית. אתם בשליטה מלאה!
                 </div>
               </button>
               
@@ -1628,7 +1629,7 @@
             </div>
             
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light); margin-bottom: 1rem;">
-              <strong>💡 המלצה:</strong> אם אתה מתחיל, בחר בהתקדמות מובנית או בחירה חופשית.
+              <strong>💡 המלצה:</strong> אם אתם מתחילים, בחרו בהתקדמות מובנית או בחירה חופשית.
             </div>
 
             <button class="btn btn-secondary" onclick="app.showTutorialModal()" style="width: 100%;">
@@ -1724,7 +1725,7 @@
             <h3>🚦 מערכת הרמזור</h3>
             
             <p style="margin-bottom: 1.5rem; line-height: 1.8;">
-              כל מילה עוברת דרך שלושה שלבים עד שהיא נשלטת לחלוטין. בכל שיעור אתה רואה מילים אקראיות מכל השלבים. המטרה היא להגיע לשלב הירוק (✅ שלוט) עבור כל המילים!
+              כל מילה עוברת דרך שלושה שלבים עד שהיא נשלטת לחלוטין. בכל שיעור אתם רואים מילים אקראיות מכל השלבים. המטרה היא להגיע לשלב הירוק (✅ שלוט) עבור כל המילים!
             </p>
             
             <div class="legend-item">
@@ -1734,7 +1735,7 @@
             
             <div class="legend-item">
               <div class="legend-dot" style="background: var(--orange);"></div>
-              <span><strong>🟧 כתום (התחלה):</strong> זכרת את המילה פעם אחת נכון. אתה בדרך הנכונה!</span>
+              <span><strong>🟧 כתום (התחלה):</strong> זכרתם את המילה פעם אחת נכון. אתם בדרך הנכונה!</span>
             </div>
             
             <div class="legend-item">
@@ -1752,7 +1753,7 @@
               <div style="margin-bottom: 1rem;">
                 <strong>📍 שלב 1 (אדום - חדש):</strong>
                 <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">
-                  למדת את המילה בפעם הראשונה. אתה תראה אותה שוב בשיעור הבא וביום זה (תוך שעות ספורות)
+                  למדתם את המילה בפעם הראשונה. תראו אותה שוב בשיעור הבא וביום זה (תוך שעות ספורות)
                 </p>
               </div>
               
@@ -1809,7 +1810,7 @@
           <div class="mastery-section">
             <div class="mastery-title">🎯 כלל השולט</div>
             <div class="mastery-description">
-              מילה נשלטת לחלוטין והוסרה מהתור הפעיל לאחר שענו נכון <strong>פעמיים ברציפות</strong>. שמור על ההישג חי!
+              בקצרה: כאשר אתם מצליחים לזכור מילה נכון <strong>פעמיים ברציפות</strong>, היא מוגדרת כשלוטה ויורדת מהתור הפעיל. תמשיכו לחזור עליה מדי פעם כדי לשמור על ההישג!
             </div>
           </div>
           
@@ -1899,6 +1900,10 @@
 
             <button class="btn btn-secondary" onclick="app.showFlaggedWordsModal()" style="width: 100%; margin-top: 0.75rem;">
               🚩 מילים שסימנתי${this.words.filter(w => w.flagged).length > 0 ? ` (${this.words.filter(w => w.flagged).length})` : ''}
+            </button>
+
+            <button class="btn btn-secondary" onclick="app.showMasteredWordsModal()" style="width: 100%; margin-top: 0.75rem;">
+              ✅ מילים ששלטתי בהן${this.words.filter(w => w.status === 'green').length > 0 ? ` (${this.words.filter(w => w.status === 'green').length})` : ''}
             </button>
 
             ${currentUser ? `
@@ -2079,6 +2084,49 @@
           `;
         }
         this.showModal('🚩 מילים שסומנו', content);
+      }
+
+      // Lets someone undo a mastery they don't actually trust (e.g. they
+      // guessed right twice by luck) - sends the word back to the active
+      // queue from scratch, same as if it had never been answered.
+      unmasterWord(wordId) {
+        const word = this.words.find(w => w.id === wordId);
+        if (!word) return;
+        word.status = 'red';
+        word.streak = 0;
+        word.dueAt = null;
+        word.updatedAt = Date.now();
+        this.saveProgress();
+        this.showMasteredWordsModal();
+      }
+
+      showMasteredWordsModal() {
+        const mastered = this.words.filter(w => w.status === 'green');
+        let content;
+        if (mastered.length === 0) {
+          content = `
+            <p style="text-align: center; color: var(--text-secondary);">
+              עדיין אין לכם מילים ששלטתם בהן. ברגע שתזכרו מילה נכון פעמיים ברציפות, היא תופיע כאן.
+            </p>
+          `;
+        } else {
+          content = `
+            <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+              ${mastered.length} מילים ששלטתם בהן. אם מילה בעצם לא ידועה לכם טוב - אפשר להחזיר אותה לשינון.
+            </p>
+            <div style="max-height: 50vh; overflow-y: auto;">
+              ${mastered.map(w => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light); gap: 0.75rem;">
+                  <div>
+                    <strong>${w.english}</strong> - ${w.hebrew}
+                  </div>
+                  <button onclick="app.unmasterWord(${w.id})" class="btn btn-sm btn-secondary" style="flex-shrink: 0;">החזר לשינון</button>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+        this.showModal('✅ מילים ששלטתי בהן', content);
       }
 
       showProgressModal() {
