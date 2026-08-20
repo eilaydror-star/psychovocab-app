@@ -1,4 +1,14 @@
-﻿    class VocabularyApp {
+﻿    // Captured as early as possible - Chrome/Android fires this once the
+    // page is eligible for installation, and calling .prompt() on it later
+    // is the only way to trigger the native "Install app" dialog instead
+    // of just linking people to browser-menu instructions.
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+    });
+
+    class VocabularyApp {
       constructor() {
         this.words = this.initializeWords();
         this.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
@@ -14,6 +24,7 @@
         this.friends = {}; // friendUid -> true (Firebase users only, see showFriendsModal)
         this.lastSaved = null;
         this.autoSaveInterval = null;
+        this.breakTimerId = null; // Recommends a break after 7 min in one set - see startBreakTimer
         this.currentUser = null; // Firebase user
         this.userSkippedLogin = false; // Track if user skipped login screen
         
@@ -104,7 +115,42 @@
         this.sessionIndex = 0;
         this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
         this.sessionActive = true;
+        this.startBreakTimer();
         this.render();
+      }
+
+      // Recommends a break 7 minutes into a set - not a hard stop, just a
+      // nudge, since a set dragging on that long is usually a sign of
+      // fatigue (lots of wrong answers/re-drills), not focus.
+      startBreakTimer() {
+        this.clearBreakTimer();
+        this.breakTimerId = setTimeout(() => {
+          this.breakTimerId = null;
+          this.showBreakRecommendationModal();
+        }, 7 * 60 * 1000);
+      }
+
+      clearBreakTimer() {
+        if (this.breakTimerId) {
+          clearTimeout(this.breakTimerId);
+          this.breakTimerId = null;
+        }
+      }
+
+      showBreakRecommendationModal() {
+        const content = `
+          <div style="text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem;">⏰</div>
+            <p style="margin-bottom: 1.5rem; line-height: 1.8;">
+              אתם משננים כבר 7 דקות ברצף. הפסקה קצרה עכשיו ותמשיכו רעננים אחר כך - ריכוז לזמן קצר עובד טוב יותר מריצה ארוכה.
+            </p>
+            <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="app.closeModal(); app.endSession();">בואו נעצור כאן</button>
+              <button class="btn btn-secondary" onclick="app.closeModal()">אמשיך עוד קצת</button>
+            </div>
+          </div>
+        `;
+        this.showModal('⏰ זמן להפסקה?', content);
       }
 
       recordStudySession() {
@@ -248,6 +294,7 @@
       }
       
       endSession() {
+        this.clearBreakTimer();
         this.sessionActive = false;
         this.saveState();
         this.render();
@@ -683,6 +730,7 @@
       goBack() {
         // Exit session and return to menu - automatically save progress
         if (confirm('הגיע לך להפסיק את השיעור? ההתקדמות תישמר.')) {
+          this.clearBreakTimer();
           this.saveProgress(); // Auto-save before exiting
           this.sessionActive = false;
           this.sessionIndex = 0;
@@ -1256,9 +1304,11 @@
         if (screen === 'login') {
           this.userSkippedLogin = false;
         } else if (screen === 'level-selector') {
+          this.clearBreakTimer();
           this.sessionActive = false;
           this.showLevelSelector = true;
         } else if (screen === 'start') {
+          this.clearBreakTimer();
           this.sessionActive = false;
           this.showLevelSelector = false;
         } else if (screen === 'session') {
@@ -1308,6 +1358,7 @@
 
         this.setupModalClose();
         this.maybeShowTutorial();
+        this.maybeShowInstallPrompt();
       }
 
       // Auto-shows the beginner's guide exactly once per device, the first
@@ -1389,7 +1440,90 @@
 
         this.showModal('🧭 מדריך למתחילים', content);
       }
-      
+
+      isRunningStandalone() {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      }
+
+      // Auto-shows once, on mobile only (the whole concept is meaningless
+      // on desktop), and never if it's already installed. Waits a beat and
+      // then checks no other modal (typically the tutorial, on a brand-new
+      // visit) is already open before showing - if one is, this visit is
+      // skipped rather than stacking modals, and it'll try again next visit.
+      maybeShowInstallPrompt() {
+        if (this._installPromptChecked || this.sessionActive) return;
+        this._installPromptChecked = true;
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (!isMobile || this.isRunningStandalone()) return;
+        try {
+          if (localStorage.getItem('psychovocab_install_prompt_seen')) return;
+          setTimeout(() => {
+            if (document.getElementById('modal-overlay').style.display === 'flex') return;
+            localStorage.setItem('psychovocab_install_prompt_seen', '1');
+            this.showInstallPromptModal();
+          }, 4000);
+        } catch (e) {
+          // localStorage unavailable - just skip the auto-popup.
+        }
+      }
+
+      showInstallPromptModal() {
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.MSStream;
+
+        if (isIOS) {
+          const content = `
+            <div style="text-align: center;">
+              <div style="font-size: 2.5rem; margin-bottom: 1rem;">📲</div>
+              <p style="margin-bottom: 1.5rem; line-height: 1.8;">
+                אפשר להוסיף את PsychoVocab למסך הבית שלך, ולפתוח אותה כמו אפליקציה רגילה - בלי הדפדפן מסביב.
+              </p>
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; text-align: right; line-height: 2;">
+                <div>1️⃣ לחצו על כפתור השיתוף <strong>􀈂</strong> בסרגל הכלים למטה</div>
+                <div>2️⃣ גללו ובחרו <strong>״הוסף למסך הבית״</strong></div>
+                <div>3️⃣ לחצו <strong>״הוסף״</strong> למעלה</div>
+              </div>
+            </div>
+          `;
+          this.showModal('📲 הוסיפו למסך הבית', content);
+          return;
+        }
+
+        if (deferredInstallPrompt) {
+          const content = `
+            <div style="text-align: center;">
+              <div style="font-size: 2.5rem; margin-bottom: 1rem;">📲</div>
+              <p style="margin-bottom: 1.5rem; line-height: 1.8;">
+                אפשר להתקין את PsychoVocab למסך הבית שלך, ולפתוח אותה כמו אפליקציה רגילה - בלי הדפדפן מסביב.
+              </p>
+              <button class="btn btn-primary" onclick="app.triggerNativeInstall()" style="width: 100%;">
+                📲 התקן עכשיו
+              </button>
+            </div>
+          `;
+          this.showModal('📲 התקינו את PsychoVocab', content);
+          return;
+        }
+
+        const content = `
+          <div style="text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem;">📲</div>
+            <p style="line-height: 1.8;">
+              אפשר להוסיף את PsychoVocab למסך הבית מתוך תפריט הדפדפן (בדרך כלל שלוש נקודות למעלה) - חפשו ״הוסף למסך הבית״ או ״התקן אפליקציה״.
+            </p>
+          </div>
+        `;
+        this.showModal('📲 הוסיפו למסך הבית', content);
+      }
+
+      triggerNativeInstall() {
+        this.closeModal();
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.finally(() => {
+          deferredInstallPrompt = null;
+        });
+      }
+
       renderLoginScreen(appContent) {
         let html = `
           <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;">
@@ -1727,6 +1861,11 @@
             <button class="btn btn-secondary" onclick="app.shareApp()">
               📤 שתף עם חבר
             </button>
+            ${!this.isRunningStandalone() ? `
+              <button class="btn btn-secondary" onclick="app.showInstallPromptModal()">
+                📲 הוסף למסך הבית
+              </button>
+            ` : ''}
           </div>
         `;
         
@@ -2011,11 +2150,11 @@
             </div>
 
             <div class="grade-buttons">
-              <button class="grade-circle-btn dont-know" onclick="app.gradeCurrentCard(app.getCurrentSessionWord(), false)">
+              <button class="grade-circle-btn dont-know" onclick="this.blur(); app.gradeCurrentCard(app.getCurrentSessionWord(), false)">
                 <span class="grade-circle">✕</span>
                 <span class="grade-label">לא מכיר</span>
               </button>
-              <button class="grade-circle-btn know" onclick="app.attemptGradeKnown(app.getCurrentSessionWord())">
+              <button class="grade-circle-btn know" onclick="this.blur(); app.attemptGradeKnown(app.getCurrentSessionWord())">
                 <span class="grade-circle">✓</span>
                 <span class="grade-label">מכיר</span>
               </button>
@@ -2391,50 +2530,92 @@
         });
       }
 
+      // Tracks the finger/mouse in real time so the card actually follows
+      // the drag (translate + slight rotation, live) instead of staying
+      // frozen until release - that dead period was what made swiping feel
+      // laggy/inaccurate. A vertical scroll is only blocked once the drag
+      // is confidently horizontal, so normal page scrolling still works.
       setupCardSwipeDetection(element, word) {
-        let touchStartX = 0;
+        const minSwipeDistance = 90;
+        let startX = 0, startY = 0, currentX = 0;
+        let dragging = false, decided = false, horizontal = false;
+
+        const beginDrag = (x, y) => {
+          startX = x; startY = y; currentX = x;
+          dragging = true; decided = false; horizontal = false;
+          element.style.transition = 'none';
+        };
+
+        const updateDrag = (x, y, evt) => {
+          if (!dragging) return;
+          const dx = x - startX;
+          const dy = y - startY;
+          if (!decided && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+            decided = true;
+            horizontal = Math.abs(dx) > Math.abs(dy);
+          }
+          if (!horizontal) return;
+          if (evt && evt.cancelable) evt.preventDefault();
+          currentX = x;
+          element.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
+          element.style.opacity = String(Math.max(0.45, 1 - Math.abs(dx) / 400));
+        };
+
+        const resetCard = () => {
+          element.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+          element.style.transform = '';
+          element.style.opacity = '1';
+        };
+
+        const endDrag = () => {
+          if (!dragging) return;
+          dragging = false;
+          if (!horizontal) { resetCard(); return; }
+
+          const dx = currentX - startX;
+          if (Math.abs(dx) < minSwipeDistance) { resetCard(); return; }
+
+          this._justSwiped = true;
+          if (dx > 0) {
+            const wasRevealed = this._revealed;
+            this.attemptGradeKnown(word);
+            // Not revealed yet: attemptGradeKnown only flipped the card
+            // face-up, it didn't grade/remove it - snap back to center
+            // instead of leaving it dragged off to the side.
+            if (!wasRevealed) resetCard();
+          } else {
+            this.gradeCurrentCard(word, false);
+          }
+        };
 
         element.addEventListener('touchstart', (e) => {
-          touchStartX = e.changedTouches[0].screenX;
-        }, false);
+          const t = e.touches[0];
+          beginDrag(t.clientX, t.clientY);
+        }, { passive: true });
 
-        element.addEventListener('touchend', (e) => {
-          const touchEndX = e.changedTouches[0].screenX;
-          this.handleCardSwipe(touchStartX, touchEndX, word);
-        }, false);
+        element.addEventListener('touchmove', (e) => {
+          const t = e.touches[0];
+          updateDrag(t.clientX, t.clientY, e);
+        }, { passive: false });
 
-        // Also support mouse swipe (desktop testing / trackpad drag)
+        element.addEventListener('touchend', endDrag);
+        element.addEventListener('touchcancel', () => { dragging = false; resetCard(); });
+
+        // Mouse drag (desktop testing / trackpad)
         let mouseDown = false;
-        let mouseStartX = 0;
-
         element.addEventListener('mousedown', (e) => {
           mouseDown = true;
-          mouseStartX = e.screenX;
+          beginDrag(e.clientX, e.clientY);
         });
-
-        element.addEventListener('mouseup', (e) => {
-          if (mouseDown) {
-            this.handleCardSwipe(mouseStartX, e.screenX, word);
-            mouseDown = false;
-          }
+        window.addEventListener('mousemove', (e) => {
+          if (!mouseDown) return;
+          updateDrag(e.clientX, e.clientY, e);
         });
-
-        element.addEventListener('mouseleave', () => {
+        window.addEventListener('mouseup', () => {
+          if (!mouseDown) return;
           mouseDown = false;
+          endDrag();
         });
-      }
-
-      handleCardSwipe(startX, endX, word) {
-        const distance = endX - startX;
-        const minSwipeDistance = 50;
-        if (Math.abs(distance) < minSwipeDistance) return;
-
-        this._justSwiped = true;
-        if (distance > 0) {
-          this.attemptGradeKnown(word);
-        } else {
-          this.gradeCurrentCard(word, false);
-        }
       }
 
       gradeCurrentCard(word, correct) {
