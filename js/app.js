@@ -1933,6 +1933,11 @@
                     ↗ יציאה
                   </button>
                 </div>
+                ${currentUser.email === 'eilaydror@gmail.com' ? `
+                  <button class="btn btn-secondary" onclick="app.showWordReportsModal()" style="width: 100%; margin-top: 0.75rem;">
+                    🛠️ דוחות מילים מכל המשתמשים
+                  </button>
+                ` : ''}
               </div>
             ` : ''}
           </div>
@@ -2064,7 +2069,67 @@
         word.flagged = !word.flagged;
         word.updatedAt = Date.now();
         this.saveProgress();
+        this.syncFlagReport(word);
         this.render();
+      }
+
+      // Flags are otherwise private to each user's own progress node (by
+      // design - see the RTDB rules). Without this, whoever flags a word
+      // on their own device is invisible to everyone else, including the
+      // person who actually needs to fix the word list. This writes a
+      // second, tiny record to a shared location only the app owner can
+      // read (see wordReports rule), so real reports don't get lost.
+      syncFlagReport(word) {
+        if (!firebaseReady || !currentUser) return;
+        const ref = db.ref(`wordReports/${word.id}/${currentUser.uid}`);
+        if (word.flagged) {
+          ref.set({
+            english: word.english,
+            hebrew: word.hebrew,
+            reportedAt: firebase.database.ServerValue.TIMESTAMP
+          }).catch((error) => {
+            console.warn('Could not sync flag report:', error.message);
+          });
+        } else {
+          ref.remove().catch(() => {});
+        }
+      }
+
+      // Admin-only view (gated both in the UI, below, and by the RTDB
+      // read rule itself) listing every word flagged by any user, most
+      // widely-reported first.
+      showWordReportsModal() {
+        if (!firebaseReady || !currentUser) {
+          this.showModal('🛠️ דוחות מילים', '<p style="text-align: center; color: var(--text-secondary);">צריך להתחבר כדי לראות דוחות.</p>');
+          return;
+        }
+        db.ref('wordReports').once('value').then((snap) => {
+          const data = snap.val() || {};
+          const rows = Object.entries(data).map(([wordId, reports]) => {
+            const sample = Object.values(reports)[0];
+            return { wordId, english: sample.english, hebrew: sample.hebrew, reporterCount: Object.keys(reports).length };
+          }).sort((a, b) => b.reporterCount - a.reporterCount);
+
+          let content;
+          if (rows.length === 0) {
+            content = '<p style="text-align: center; color: var(--text-secondary);">אין עדיין דיווחים ממשתמשים.</p>';
+          } else {
+            content = `
+              <p style="margin-bottom: 1rem; color: var(--text-secondary);">${rows.length} מילים דווחו על ידי משתמשים, מהמדווחת ביותר.</p>
+              <div style="max-height: 60vh; overflow-y: auto;">
+                ${rows.map(r => `
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light); gap: 0.75rem;">
+                    <div><strong>${this.escapeHtml(r.english)}</strong> - ${this.escapeHtml(r.hebrew)}</div>
+                    <span style="color: var(--red); font-weight: 600; font-size: 0.85rem; flex-shrink: 0;">${r.reporterCount} דיווח${r.reporterCount > 1 ? 'ים' : ''}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }
+          this.showModal('🛠️ דוחות מילים מכל המשתמשים', content);
+        }).catch((error) => {
+          this.showModal('🛠️ דוחות מילים', `<p style="text-align: center; color: var(--red);">שגיאה בטעינת דוחות: ${this.escapeHtml(error.message)}</p>`);
+        });
       }
 
       showFlaggedWordsModal() {
