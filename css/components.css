@@ -165,6 +165,44 @@
   display: none !important;
 }
 
+.english-word-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.english-word-row .english-word {
+  margin-bottom: 0;
+}
+
+.speak-btn {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  color: var(--sage-green);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+
+.speak-btn:hover {
+  background: var(--light-sage);
+  border-color: var(--sage-green);
+}
+
+.speak-btn:active {
+  transform: scale(0.92);
+}
+
 .hebrew-translation {
   font-size: 2rem;
   font-weight: 600;

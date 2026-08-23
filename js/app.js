@@ -748,6 +748,19 @@
         this.updateAssociation(wordId, suggestion);
       }
 
+      // Reads an English word aloud using the browser's built-in TTS engine -
+      // no external service or per-word audio authoring needed for 3500 words.
+      speakWord(source) {
+        if (!('speechSynthesis' in window)) return;
+        const text = typeof source === 'string' ? source : source?.dataset?.word;
+        if (!text) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      }
+
       generateAssociationSuggestion(word) {
         const phonetic = this.transliterateToHebrew(word.english);
         const templates = [
@@ -2043,7 +2056,10 @@
 
             <div class="word-card swipe-area" id="current-word-card">
               <div class="word-emoji">${word.emoji}</div>
-              <div class="english-word">${word.english}</div>
+              <div class="english-word-row">
+                <span class="english-word">${word.english}</span>
+                <button type="button" class="speak-btn" data-word="${this.escapeHtml(word.english)}" onclick="event.stopPropagation(); app.speakWord(this)" aria-label="השמע הגייה" title="השמע הגייה">🔊</button>
+              </div>
               <div class="hebrew-translation hidden" id="hebrew-word">${word.hebrew}</div>
               <div id="toggle-hint" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">לחץ לגילוי התרגום</div>
               <button onclick="event.stopPropagation(); app.toggleNoteField(${word.id})" style="margin-top: 1.5rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">
