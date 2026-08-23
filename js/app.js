@@ -1277,10 +1277,15 @@
       }
       
       getScreenType() {
-        // Mirrors the login-screen condition in render() exactly, so the
-        // back-button history stack always agrees with what render()
-        // actually shows.
-        if ((firebaseReady && !currentUser && !this.userSkippedLogin) || (!this.userSkippedLogin && !currentUser && !this.sessionActive)) {
+        // Show the login screen only when there's nothing else to show
+        // instead: no logged-in user, login wasn't explicitly skipped, and
+        // there's no session already in progress. Without the sessionActive
+        // check here, Firebase finishing its (async, ~1s-after-load) init
+        // and flipping firebaseReady to true would bounce a guest user who
+        // is mid-session back to the login screen on their very next
+        // render() - e.g. the next time they grade a word - even though
+        // they never asked to log in or leave the session.
+        if (!currentUser && !this.userSkippedLogin && !this.sessionActive) {
           return 'login';
         }
         if (this.sessionActive) return 'session';
