@@ -28,16 +28,11 @@
         this.currentUser = null; // Firebase user
         this.userSkippedLogin = false; // Track if user skipped login screen
         
-        // Difficulty filter - by default, study all difficulty levels
-        // But weight by test probability
-        this.difficultyFilter = { easy: true, moderate: true, hard: true };
-        
-        // Level progression
-        this.levelProgression = 'free'; // 'free', 'easy', 'moderate', 'hard', 'structured'
-        this.currentLevel = 'easy'; // Current level user is on
-        this.unlockedLevels = { easy: true, moderate: false, hard: false }; // For structured mode
-        this.showLevelSelector = true; // Show level selector on first load
-        
+        // Difficulty tier: no manual picker any more - the app always
+        // works through 'easy' words first, then automatically starts
+        // introducing 'moderate' once every easy word is mastered (green),
+        // then 'hard' once moderate is mastered. See getCurrentTier().
+
         // Reading timer
         this.readingTimerActive = false;
         this.readingTimerPaused = false;
@@ -77,29 +72,58 @@
         return WORDS_DATA.map(w => ({ ...w, dueAt: null, flagged: false, updatedAt: null }));
       }
       
+      // Which difficulty tier the user is currently working through. There
+      // is no manual picker for this any more - it's derived purely from
+      // mastery: stay on 'easy' until every easy word is green, then move
+      // to 'moderate', then 'hard'. Recomputed on demand (not stored), so
+      // it can never go stale relative to this.words.
+      getCurrentTier() {
+        const tiers = ['easy', 'moderate', 'hard'];
+        for (const tier of tiers) {
+          const tierWords = this.words.filter(w => w.difficulty === tier);
+          if (tierWords.length === 0) continue; // no words at this tier - skip it
+          const allMastered = tierWords.every(w => w.status === 'green');
+          if (!allMastered) return tier;
+        }
+        return 'hard'; // everything mastered - nothing left to advance to
+      }
+
       startNewSession() {
-        // Filter remaining words by difficulty setting
-        let remaining = this.words.filter(w => w.status !== 'green');
+        // Scope this session to the user's current tier only. This is also
+        // the fix for words the user "never studied before" showing up
+        // unexpectedly: previously every not-yet-green word across every
+        // difficulty (or, in "free" mode, literally all ~3500 words) was
+        // immediately eligible for selection, so a session could surface a
+        // word from anywhere in the whole remaining pool. Now only the
+        // current tier is in play at all.
+        const tierWords = this.words.filter(w => w.difficulty === this.getCurrentTier() && w.status !== 'green');
 
-        // Filter by selected difficulty levels
-        remaining = remaining.filter(w => {
-          if (w.difficulty === 'easy') return this.difficultyFilter.easy;
-          if (w.difficulty === 'moderate') return this.difficultyFilter.moderate;
-          if (w.difficulty === 'hard') return this.difficultyFilter.hard;
-          return true;
-        });
+        if (tierWords.length === 0) return;
 
-        if (remaining.length === 0) return;
+        // Within the tier, also bound how many brand-new (never-attempted)
+        // words are "unlocked" for study at once, instead of the entire
+        // tier - which can be 1000+ words - being eligible from the first
+        // session. Words already attempted before (in progress, or
+        // previously missed) are always eligible; new words fill in the
+        // remaining room, most exam-relevant first, so new material is
+        // introduced gradually as older words get mastered and free up room.
+        const ACTIVE_POOL_SIZE = 30;
+        const started = tierWords.filter(w => w.updatedAt !== null);
+        const notStarted = tierWords
+          .filter(w => w.updatedAt === null)
+          .sort((a, b) => b.testProbability - a.testProbability || a.id - b.id);
+        const activeNotStarted = notStarted.slice(0, Math.max(0, ACTIVE_POOL_SIZE - started.length));
+        const pool = [...started, ...activeNotStarted];
 
         // Real spaced repetition: a word you just got right (red -> orange)
         // rests for a few hours (see markWordKnown) before it's eligible
         // again, instead of being immediately re-drillable. Only words
         // that are actually due get selected into a new session.
         const now = Date.now();
-        const due = remaining.filter(w => w.status === 'red' || !w.dueAt || w.dueAt <= now);
+        const due = pool.filter(w => w.status === 'red' || !w.dueAt || w.dueAt <= now);
 
         if (due.length === 0) {
-          this.showRestingModal(remaining);
+          this.showRestingModal(pool);
           return;
         }
 
@@ -300,104 +324,32 @@
         this.render();
       }
       
-      toggleDifficulty(level) {
-        // Toggle the difficulty filter
-        this.difficultyFilter[level] = !this.difficultyFilter[level];
-        
-        // Ensure at least one difficulty is selected
-        const anySelected = Object.values(this.difficultyFilter).some(v => v);
-        if (!anySelected) {
-          this.difficultyFilter[level] = true; // Re-enable the clicked one
-        }
-        
-        this.saveState();
-        this.render();
-      }
-      
-      setLevelProgression(mode, startLevel = 'easy') {
-        // mode: 'free' (all levels), 'easy', 'moderate', 'hard', 'structured' (easy→moderate→hard)
-        this.levelProgression = mode;
-        this.currentLevel = startLevel;
-        this.showLevelSelector = false;
-        // Once the user has picked a study mode, treat that as having
-        // skipped/opted out of login, so they land on the start screen
-        // instead of an (often non-functional) login wall.
-        this.userSkippedLogin = true;
-        
-        if (mode === 'free') {
-          // Free mode - access all levels
-          this.difficultyFilter = { easy: true, moderate: true, hard: true };
-        } else if (mode === 'structured') {
-          // Structured mode - unlock gradually
-          this.unlockedLevels = { easy: true, moderate: false, hard: false };
-          this.currentLevel = 'easy';
-          this.difficultyFilter = { easy: true, moderate: false, hard: false };
-        } else {
-          // Single level mode
-          this.difficultyFilter = { easy: false, moderate: false, hard: false };
-          this.difficultyFilter[mode] = true;
-          this.currentLevel = mode;
-        }
-        
-        this.saveState();
-        this.render();
-      }
-      
-      switchLevel(level) {
-        // Switch to a different level (only if unlocked or in free mode)
-        if (this.levelProgression === 'free' || this.unlockedLevels[level] || this.levelProgression === level) {
-          this.currentLevel = level;
-          this.difficultyFilter = { easy: false, moderate: false, hard: false };
-          this.difficultyFilter[level] = true;
-          this.saveState();
-          this.render();
-        }
-      }
-      
-      unlockNextLevel() {
-        // Unlock the next level in structured progression
-        if (this.levelProgression === 'structured') {
-          if (this.currentLevel === 'easy' && !this.unlockedLevels.moderate) {
-            this.unlockedLevels.moderate = true;
-            this.showLevelUnlockedModal('moderate');
-          } else if (this.currentLevel === 'moderate' && !this.unlockedLevels.hard) {
-            this.unlockedLevels.hard = true;
-            this.showLevelUnlockedModal('hard');
-          }
-          this.saveState();
-        }
-      }
-      
-      showLevelUnlockedModal(level) {
-        const levelNames = {
-          'easy': '🟢 קל',
-          'moderate': '🟡 בינוני',
-          'hard': '🔴 קשה'
-        };
-        const levelEmoji = { 'easy': '🟢', 'moderate': '🟡', 'hard': '🔴' };
-        
+      // Shown automatically (never picked manually) the moment the user
+      // masters the last word of a tier and the app advances them into the
+      // next one - see markWordKnown().
+      showTierUnlockedModal(tier) {
+        const tierNames = { easy: '🟢 קל', moderate: '🟡 בינוני', hard: '🔴 קשה' };
+        const tierEmoji = { easy: '🟢', moderate: '🟡', hard: '🔴' };
+
         const content = `
           <div style="text-align: center;">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">${levelEmoji[level]}</div>
-            <h2 style="color: var(--teal); margin-bottom: 1rem;">רמה חדשה נחשפה!</h2>
+            <div style="font-size: 3rem; margin-bottom: 1rem;">${tierEmoji[tier]}</div>
+            <h2 style="color: var(--teal); margin-bottom: 1rem;">רמה חדשה נפתחה!</h2>
             <p style="font-size: 1.2rem; margin-bottom: 1.5rem;">
-              שלטתם בכל המילים בהצלחה! 🎉
+              שלטתם בכל המילים ברמה הקודמת! 🎉
             </p>
             <p style="margin-bottom: 1.5rem;">
-              עכשיו אתם יכולים ללמוד מילים <strong>${levelNames[level]}</strong>
+              מעכשיו יתווספו לשיעורים שלכם גם מילים ברמת <strong>${tierNames[tier]}</strong>
             </p>
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
-              <strong>💡 טיפ:</strong> הקשו יותר קשה!
-            </div>
-            <button class="btn btn-primary" onclick="app.closeModal(); app.switchLevel('${level}')">
-              התחל ללמוד ${levelNames[level]}
+            <button class="btn btn-primary" onclick="app.closeModal()">
+              מעולה, בואו נמשיך
             </button>
           </div>
         `;
-        
+
         this.showModal('🎊 הזדמנות חדשה!', content);
       }
-      
+
       startReadingTimer(minutes = 30) {
         this.readingTimeRemaining = minutes * 60;
         this.readingTimeTotal = minutes * 60;
@@ -845,17 +797,25 @@
       }
       
       saveState() {
+        // Persist the in-progress session itself (not just per-word
+        // progress) so exiting mid-set and coming back later resumes the
+        // exact same set of words in the exact same order, instead of
+        // rolling a brand new random session. The words' own status/dueAt/
+        // streak (already inside `words` above) already capture every
+        // answer given so far in this session - only the session's
+        // membership/order and its running tally need to be saved
+        // separately. Word objects themselves aren't duplicated here, just
+        // their ids, since the full objects already live in `words`.
         const state = {
           words: this.words,
           allTimeStats: this.allTimeStats,
-          difficultyFilter: this.difficultyFilter,
-          levelProgression: this.levelProgression,
-          currentLevel: this.currentLevel,
-          unlockedLevels: this.unlockedLevels,
           currentStreak: this.currentStreak,
           sessionsToday: this.sessionsToday,
           lastStudyDate: this.lastStudyDate,
           studyHistory: this.studyHistory,
+          sessionActive: this.sessionActive,
+          sessionWordIds: this.currentSession.map(w => w.id),
+          sessionStats: this.sessionStats,
           lastSaved: new Date().toISOString()
         };
         if (saveToLocalStorage(state)) {
@@ -914,6 +874,9 @@
               sessionsToday: this.sessionsToday,
               lastStudyDate: this.lastStudyDate,
               studyHistory: this.studyHistory,
+              sessionActive: this.sessionActive,
+              sessionWordIds: this.currentSession.map(w => w.id),
+              sessionStats: this.sessionStats,
               lastSaved: new Date().toISOString(),
               lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
             };
@@ -994,6 +957,7 @@
               this.sessionsToday = data.sessionsToday ?? this.sessionsToday;
               this.lastStudyDate = data.lastStudyDate ?? this.lastStudyDate;
               this.studyHistory = data.studyHistory ?? this.studyHistory;
+              this.restoreSession(data, freshWords);
               this.render();
             } else {
               console.log('No Firebase progress found, using local');
@@ -1021,6 +985,44 @@
       loadProgressFromLocalStorage() {
         // Load from localStorage (fallback)
         this.loadState();
+      }
+
+      // Rebuilds this.currentSession/sessionActive/sessionStats from saved
+      // data, so a mid-set exit resumes the exact same words in the exact
+      // same order instead of always rolling a new session. `words` must
+      // already be the fully-merged word list (saved progress applied) so
+      // the restored session references the same live objects as
+      // this.words, not stale copies. Only "resumes" when there's actually
+      // something left to resume - if the saved session had already been
+      // fully completed (or the words it referenced no longer exist), it's
+      // treated the same as no in-progress session at all, and the next
+      // "start" click builds a fresh one via startNewSession().
+      restoreSession(data, words) {
+        this.sessionStats = (data && data.sessionStats) || { correct: 0, incorrect: 0, streak: 0 };
+
+        const savedIds = data && Array.isArray(data.sessionWordIds) ? data.sessionWordIds : [];
+        if (!data || !data.sessionActive || savedIds.length === 0) {
+          this.sessionActive = false;
+          this.currentSession = [];
+          return;
+        }
+
+        const wordsById = {};
+        words.forEach(w => { wordsById[w.id] = w; });
+        const restored = savedIds.map(id => wordsById[id]).filter(Boolean);
+
+        if (restored.length === 0) {
+          // Words referenced by the saved session are gone (e.g. word data
+          // changed) - nothing left to resume.
+          this.sessionActive = false;
+          this.currentSession = [];
+          return;
+        }
+
+        this.currentSession = restored;
+        this.sessionActive = true;
+        this.sessionIndex = 0;
+        this.startBreakTimer();
       }
       
       loadState() {
@@ -1053,16 +1055,12 @@
 
             this.words = freshWords; // Use fresh words array
             this.allTimeStats = data.allTimeStats;
-            this.difficultyFilter = data.difficultyFilter || { easy: true, moderate: true, hard: true };
-            this.levelProgression = data.levelProgression || 'free';
-            this.currentLevel = data.currentLevel || 'easy';
-            this.unlockedLevels = data.unlockedLevels || { easy: true, moderate: false, hard: false };
             this.currentStreak = data.currentStreak || 0;
             this.sessionsToday = data.sessionsToday || 0;
             this.lastStudyDate = data.lastStudyDate || null;
             this.studyHistory = data.studyHistory || {};
-            this.showLevelSelector = false;
             this.lastSaved = data.lastSaved ? new Date(data.lastSaved) : null;
+            this.restoreSession(data, freshWords);
         }
       }
       
@@ -1268,6 +1266,8 @@
         this.sessionActive = false;
         this.currentSession = [];
         this.sessionIndex = 0;
+        this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
+        this.clearBreakTimer();
         this.saveState();
         this.render();
       }
@@ -1280,10 +1280,9 @@
         // Mirrors the login-screen condition in render() exactly, so the
         // back-button history stack always agrees with what render()
         // actually shows.
-        if ((firebaseReady && !currentUser && !this.userSkippedLogin) || (!this.userSkippedLogin && !currentUser && !this.sessionActive && !this.showLevelSelector)) {
+        if ((firebaseReady && !currentUser && !this.userSkippedLogin) || (!this.userSkippedLogin && !currentUser && !this.sessionActive)) {
           return 'login';
         }
-        if (this.showLevelSelector) return 'level-selector';
         if (this.sessionActive) return 'session';
         return 'start';
       }
@@ -1303,16 +1302,10 @@
         // leaving the underlying data changed but the UI stuck.
         if (screen === 'login') {
           this.userSkippedLogin = false;
-        } else if (screen === 'level-selector') {
-          this.clearBreakTimer();
-          this.sessionActive = false;
-          this.showLevelSelector = true;
         } else if (screen === 'start') {
           this.clearBreakTimer();
           this.sessionActive = false;
-          this.showLevelSelector = false;
         } else if (screen === 'session') {
-          this.showLevelSelector = false;
           this.sessionActive = this.currentSession.length > 0;
         }
         this.saveProgress();
@@ -1347,10 +1340,7 @@
         document.getElementById('current-streak').textContent = this.currentStreak;
         document.getElementById('sessions-today').textContent = this.sessionsToday;
         
-        // Show level selector if first time or user resets
-        if (this.showLevelSelector) {
-          this.renderLevelSelector(appContent);
-        } else if (!this.sessionActive) {
+        if (!this.sessionActive) {
           this.renderStartScreen(appContent, stats);
         } else {
           this.renderSession(appContent);
@@ -1362,8 +1352,8 @@
       }
 
       // Auto-shows the beginner's guide exactly once per device, the first
-      // time a new user reaches the level-selector/start screen (never
-      // mid-session, so it can't interrupt a drill in progress). Uses its
+      // time a new user reaches the start screen (never mid-session, so it
+      // can't interrupt a drill in progress). Uses its
       // own localStorage key, deliberately not synced through
       // saveState/Firebase - "have I seen the tutorial" is a per-device UI
       // fact, not learning progress.
@@ -1432,7 +1422,7 @@
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">📅 איך ללמוד נכון</h3>
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
               <div style="margin-bottom: 0.8rem;">✅ עדיף כמה שיעורים קצרים ביום מאשר שיעור ארוך אחד - זה מה שה-🔥 רצף וה-🎯 שיעורים היום בראש המסך עוקבים אחריו.</div>
-              <div style="margin-bottom: 0.8rem;">✅ בתפריט הראשי אפשר לבחור רמת קושי (קל/בינוני/קשה) ומצב לימוד - חופשי או התקדמות מובנית.</div>
+              <div style="margin-bottom: 0.8rem;">✅ הרמה (קל/בינוני/קשה) עולה אוטומטית - ברגע ששולטים בכל מילות הרמה הנוכחית, נפתחת הרמה הבאה. אין צורך לבחור ידנית.</div>
               <div>✅ ההתקדמות נשמרת אוטומטית במכשיר, ואם תתחבר עם חשבון - גם מסתנכרנת בין מכשירים.</div>
             </div>
           </div>
@@ -1688,7 +1678,6 @@
       continueWithoutLogin() {
         // Allow users to continue without Firebase/login
         this.userSkippedLogin = true;
-        this.showLevelSelector = true;
         this.render();
       }
       
@@ -1701,88 +1690,6 @@
           .catch((error) => {
             console.error('Logout error:', error);
           });
-      }
-      
-      renderLevelSelector(appContent) {
-        const easyCount = this.words.filter(w => w.difficulty === 'easy').length;
-        const modCount = this.words.filter(w => w.difficulty === 'moderate').length;
-        const hardCount = this.words.filter(w => w.difficulty === 'hard').length;
-
-        let html = `
-          <div class="start-screen">
-            <div class="start-title">🎯 בחר כיצד ללמוד</div>
-            <div class="start-description" style="margin-bottom: 2rem;">
-              בחר את אסטרטגיית הלימוד שלך:
-            </div>
-            
-            <div style="display: grid; gap: 1rem; margin-bottom: 2rem;">
-              <!-- Free Mode -->
-              <button class="btn btn-primary" onclick="app.setLevelProgression('free')" 
-                      style="padding: 1.5rem; text-align: left; font-size: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 1.1rem;">
-                  🆓 בחר בחופשיות
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  לומדים את כל המילים מכל הרמות בו-זמנית. אתם בשליטה מלאה!
-                </div>
-              </button>
-              
-              <!-- Structured Mode -->
-              <button class="btn btn-primary" onclick="app.setLevelProgression('structured')" 
-                      style="padding: 1.5rem; text-align: left; font-size: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 1.1rem;">
-                  🏔️ התקדמות מובנית
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  התחל קל → בינוני → קשה. שחרור רמות בהדרגה!
-                </div>
-              </button>
-              
-              <!-- Easy Only -->
-              <button class="btn btn-secondary" onclick="app.setLevelProgression('easy')" 
-                      style="padding: 1.5rem; text-align: left; font-size: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 1.1rem;">
-                  🟢 רק קל
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  ${easyCount.toLocaleString()} מילים שכיחות - בסיס יציב (90% בבחינה)
-                </div>
-              </button>
-              
-              <!-- Moderate Only -->
-              <button class="btn btn-secondary" onclick="app.setLevelProgression('moderate')" 
-                      style="padding: 1.5rem; text-align: left; font-size: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 1.1rem;">
-                  🟡 רק בינוני
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  ${modCount.toLocaleString()} מילים מדיום - אתגר בינוני (70% בבחינה)
-                </div>
-              </button>
-              
-              <!-- Hard Only -->
-              <button class="btn btn-secondary" onclick="app.setLevelProgression('hard')" 
-                      style="padding: 1.5rem; text-align: left; font-size: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 1.1rem;">
-                  🔴 רק קשה
-                </div>
-                <div style="font-size: 0.9rem; color: var(--text-secondary);">
-                  ${hardCount.toLocaleString()} מילים נדירות - אלוף (35% בבחינה)
-                </div>
-              </button>
-            </div>
-            
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light); margin-bottom: 1rem;">
-              <strong>💡 המלצה:</strong> אם אתם מתחילים, בחרו בהתקדמות מובנית או בחירה חופשית.
-            </div>
-
-            <button class="btn btn-secondary" onclick="app.showTutorialModal()" style="width: 100%;">
-              🧭 מדריך למתחילים - איך משתמשים באפליקציה?
-            </button>
-          </div>
-        `;
-
-        appContent.innerHTML = html;
       }
       
       renderStartScreen(appContent, stats) {
@@ -1802,35 +1709,27 @@
         `;
         
         
-        // Add difficulty filter section
-        const easyCount = this.words.filter(w => w.difficulty === 'easy').length;
-        const modCount = this.words.filter(w => w.difficulty === 'moderate').length;
-        const hardCount = this.words.filter(w => w.difficulty === 'hard').length;
-        
+        // Current-tier banner: no manual difficulty picker any more - the
+        // app decides the tier automatically (see getCurrentTier()) and
+        // just shows the learner where they stand within it.
+        const tierLabels = { easy: '🟢 קל', moderate: '🟡 בינוני', hard: '🔴 קשה' };
+        const currentTier = this.getCurrentTier();
+        const currentTierWords = this.words.filter(w => w.difficulty === currentTier);
+        const currentTierMastered = currentTierWords.filter(w => w.status === 'green').length;
+
         html += `
-          <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem; border: 1px solid var(--border-light);">
-            <div style="font-weight: 600; margin-bottom: 1rem; text-align: center; color: var(--sage-green);">
-              🎯 בחר רמות קושי לשינון
+          <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem; border: 1px solid var(--border-light); text-align: center;">
+            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--sage-green);">
+              📍 הרמה הנוכחית שלך
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8rem;">
-              <button class="btn ${this.difficultyFilter.easy ? 'btn-primary' : 'btn-secondary'}" 
-                      onclick="app.toggleDifficulty('easy')" 
-                      style="font-size: 0.9rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100px;">
-                🟢 קל<br><span style="font-size: 1.3rem; font-weight: 700; color: ${this.difficultyFilter.easy ? 'white' : 'var(--sage-green)'}; margin-top: 0.5rem;">${easyCount}</span>
-              </button>
-              <button class="btn ${this.difficultyFilter.moderate ? 'btn-primary' : 'btn-secondary'}" 
-                      onclick="app.toggleDifficulty('moderate')" 
-                      style="font-size: 0.9rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100px;">
-                🟡 בינוני<br><span style="font-size: 1.3rem; font-weight: 700; color: ${this.difficultyFilter.moderate ? 'white' : 'var(--gold-accent)'}; margin-top: 0.5rem;">${modCount}</span>
-              </button>
-              <button class="btn ${this.difficultyFilter.hard ? 'btn-primary' : 'btn-secondary'}" 
-                      onclick="app.toggleDifficulty('hard')" 
-                      style="font-size: 0.9rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100px;">
-                🔴 קשה<br><span style="font-size: 1.3rem; font-weight: 700; color: ${this.difficultyFilter.hard ? 'white' : 'var(--red)'}; margin-top: 0.5rem;">${hardCount}</span>
-              </button>
+            <div style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.4rem;">
+              ${tierLabels[currentTier]}
             </div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; margin-top: 1rem;">
-              ♻️ לחץ על הכפתורים להשהיה/הפעלה
+            <div style="font-size: 0.9rem; color: var(--text-secondary);">
+              ${currentTierMastered.toLocaleString()}/${currentTierWords.length.toLocaleString()} מילים ברמה זו שולטו
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.6rem;">
+              הרמה מתקדמת אוטומטית - ברגע ששולטים בכל המילים ברמה הנוכחית, נפתחת הרמה הבאה.
             </div>
           </div>
         `;
@@ -2112,8 +2011,22 @@
           this._revealedForWordId = word.id;
         }
 
+        // Side list of the whole set currently in play, one row per word,
+        // color-coded by the same red/orange/green status shown everywhere
+        // else - lets the learner see at a glance what's left before this
+        // set is done. Rebuilt on every render() call, so it updates live
+        // the moment a word's status changes (see markWordKnown/Unknown).
+        const sideListHtml = this.currentSession.map(w => `
+          <li class="session-word-item ${w.id === word.id ? 'active' : ''}">
+            <span class="status-dot ${w.status || 'red'}"></span>
+            <span>${w.english}</span>
+          </li>
+        `).join('');
+
         let html = `
           <div class="session-container">
+            <div class="session-layout">
+              <div class="session-main">
             <div style="text-align: center; margin-bottom: 1.5rem;">
               <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                 התקדמות: ${masteredCount}/${this.currentSession.length} מילים שולט
@@ -2160,6 +2073,12 @@
               </button>
             </div>
 
+            <div style="text-align: center; margin-top: 0.85rem;">
+              <button class="btn btn-sm btn-secondary master-word-btn" onclick="app.masterWordNow(app.getCurrentSessionWord())">
+                ✓✓ כבר יודע/ת מצוין - שינון עד תום
+              </button>
+            </div>
+
             <div style="text-align: center; margin-top: 1.5rem;">
               <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
                 Space לגילוי &nbsp;·&nbsp; U ביטול &nbsp;·&nbsp; B חזור לתפריט
@@ -2172,6 +2091,17 @@
                   ← חזור לתפריט (B)
                 </button>
               </div>
+            </div>
+              </div>
+
+              <aside class="session-sidebar">
+                <details class="session-word-list" open>
+                  <summary>המילים בסבב הנוכחי (${this.currentSession.length})</summary>
+                  <ul class="session-word-list-items">
+                    ${sideListHtml}
+                  </ul>
+                </details>
+              </aside>
             </div>
           </div>
         `;
@@ -2640,11 +2570,55 @@
         }, cardEl ? 220 : 0);
       }
 
-      markWordKnown(word) {
+      // One-click "I already know this word perfectly" - lets the learner
+      // mark it mastered (green) immediately instead of waiting for two
+      // separate correct answers across a rest period. Distinct from the
+      // regular "מכיר" grade button (which only ever advances a word one
+      // step, red->orange or orange->green) and gated behind a confirm()
+      // so a swipe/tap that lands slightly off the normal grade buttons
+      // can't silently skip the spaced-repetition check. Everything after
+      // the confirmation reuses markWordKnown's own green-state logic via
+      // its `forceMaster` flag, so stats/tier-advance/undo all stay in
+      // sync with the normal mastery path automatically.
+      masterWordNow(word) {
+        if (!word) return;
+        const confirmed = confirm(`לסמן את "${word.english}" כמילה שאתם כבר יודעים מצוין, ולדלג ישר על החזרה המרווחת (המילה תסומן ירוקה עכשיו)?`);
+        if (!confirmed) return;
+
+        const cardEl = document.getElementById('current-word-card');
+        if (cardEl) {
+          cardEl.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
+          cardEl.style.transform = 'translateX(150%) rotate(10deg)';
+          cardEl.style.opacity = '0';
+          cardEl.style.pointerEvents = 'none';
+        }
+
+        setTimeout(() => {
+          this.markWordKnown(word, true);
+        }, cardEl ? 220 : 0);
+      }
+
+      // `forceMaster` is the one-click "I already know this perfectly"
+      // path (see masterWordNow) - it skips straight to the same green
+      // end-state the normal two-correct-answers-in-a-row flow reaches on
+      // its second answer, instead of duplicating the stats/tier/undo
+      // bookkeeping below in a second function.
+      markWordKnown(word, forceMaster = false) {
         this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: true };
 
+        // Snapshot the tier before grading - if mastering this word happens
+        // to complete the whole current tier, this changes below and we
+        // celebrate the automatic advance to the next one.
+        const prevTier = this.getCurrentTier();
+
         // Progress the word's status
-        if (!word.status || word.status === 'red') {
+        if (forceMaster) {
+          // Learner already knows it well and chose to skip the spaced-
+          // repetition check entirely - mark it mastered immediately.
+          word.status = 'green';
+          word.streak = 2;
+          word.dueAt = null;
+        } else if (!word.status || word.status === 'red') {
           // First time: red -> orange. Rest for ~4 hours before it's
           // eligible for a confirmation round again - real spaced
           // repetition, not an instant re-drill.
@@ -2656,16 +2630,6 @@
           word.status = 'green';
           word.streak = 2;
           word.dueAt = null;
-
-          // Structured mode: unlock the next level once every word in the
-          // current level is mastered.
-          if (this.levelProgression === 'structured') {
-            const currentLevelWords = this.words.filter(w => w.difficulty === this.currentLevel);
-            const allLevelMastered = currentLevelWords.every(w => w.status === 'green');
-            if (allLevelMastered) {
-              this.unlockNextLevel();
-            }
-          }
         }
         word.updatedAt = Date.now();
 
@@ -2674,6 +2638,14 @@
         this.allTimeStats.totalCorrect++;
         this.saveProgress();
         this.render();
+
+        // Automatic tier progression: no manual level picker any more -
+        // mastering the last word of a tier just silently unlocks the next
+        // one, and this modal is the only thing announcing it.
+        const newTier = this.getCurrentTier();
+        if (newTier !== prevTier) {
+          this.showTierUnlockedModal(newTier);
+        }
       }
 
       markWordUnknown(word) {

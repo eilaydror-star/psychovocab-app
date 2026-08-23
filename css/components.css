@@ -374,6 +374,77 @@
 .status-dot.orange { background: var(--orange); }
 .status-dot.green { background: var(--green); }
 
+/* Side list of the current set (see .session-layout in layout.css) - one
+   row per word, dot color matches the traffic-light status above. */
+.session-word-list {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  padding: 0.85rem 1rem;
+}
+
+.session-word-list summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  list-style: none;
+}
+
+.session-word-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.session-word-list summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-left: 0.4rem;
+  transition: transform 0.15s ease;
+}
+
+.session-word-list[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.session-word-list-items {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.session-word-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.3rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-radius: 6px;
+}
+
+.session-word-item .status-dot {
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.session-word-item.active {
+  color: var(--dark-navy);
+  font-weight: 600;
+  background: var(--light-sage);
+}
+
+/* One-click "mark as fully known" - deliberately plain/text-like (not a
+   filled circle like the two grade buttons above it) so it never reads as
+   a third equally-weighted answer option; the confirm() dialog wired to it
+   in app.js is the actual guard against accidental use. */
+.master-word-btn {
+  color: var(--sage-green);
+  border-color: rgba(74, 122, 90, 0.3);
+}
+
 .swipe-area {
   cursor: grab;
   user-select: none;

@@ -6,8 +6,13 @@ Live site: https://eilaydror-star.github.io/psychovocab-app/
 
 ## How it works
 
-- 3,500 English↔Hebrew word pairs, split into easy / moderate / hard difficulty
-- A traffic-light system (red → orange → green) tracks mastery per word, using spaced repetition (a word must be answered correctly twice in a row to be marked mastered)
+- 3,500 English↔Hebrew word pairs, split into easy / moderate / hard difficulty tiers
+- A traffic-light system (red → orange → green) tracks mastery per word, using spaced repetition (a word must be answered correctly twice in a row, a few hours apart, to be marked mastered)
+- No manual difficulty picker - the app always works through the easy tier first, and automatically unlocks moderate once every easy word is green, then hard once moderate is green (`getCurrentTier()` in `js/app.js`)
+- Each 7-word study set is drawn only from the user's current tier, from a capped pool of already-started words plus a limited number of never-attempted ones, so a session never surfaces words the user hasn't actually reached yet
+- If you exit mid-set, the exact words, their order, and your progress within that set are saved (to `localStorage` and synced to Firebase) and automatically resumed the next time the app opens, instead of starting a new random session
+- During a session, a side list shows every word in the current set, color-coded red/orange/green as you go - a sidebar next to the word card on wide screens, collapsing to a drawer below it on narrow/mobile screens
+- A "שינון עד תום" button lets you mark a word you already know well as mastered (green) immediately, instead of waiting to answer it correctly twice across a rest period
 - Progress is saved to `localStorage` automatically, and also synced to Firebase Realtime Database when logged in - so progress follows you across devices
 - Firebase Authentication (email/password) handles login; each user's data is isolated by Firebase Realtime Database security rules
 

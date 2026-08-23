@@ -82,6 +82,36 @@
   box-shadow: none;
 }
 
+/* Side panel showing every word in the current set, color-coded by
+   mastery status (see .status-dot in components.css) - lives next to the
+   card on wide screens, collapses below it (and into a closeable <details>
+   drawer) once the viewport is too narrow to fit both side by side. */
+.session-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.session-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 680px) {
+  .session-layout {
+    flex-direction: column;
+  }
+
+  .session-sidebar {
+    width: 100%;
+  }
+}
+
 .session-header {
   text-align: center;
   margin-bottom: 1rem;
