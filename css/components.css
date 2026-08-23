@@ -228,6 +228,21 @@
   display: none !important;
 }
 
+.example-sentence {
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  direction: ltr;
+  padding: 0 1rem;
+}
+
+.example-sentence.hidden {
+  opacity: 0;
+  pointer-events: none;
+  display: none !important;
+}
+
 .hebrew-note {
   font-size: 0.95rem;
   color: var(--teal);

@@ -651,10 +651,12 @@
 
       toggleTranslation() {
         const hebrewEl = document.getElementById('hebrew-word');
+        const exampleEl = document.getElementById('example-sentence');
         const hintEl = document.getElementById('toggle-hint');
         if (!hebrewEl) return;
         hebrewEl.classList.toggle('hidden');
         const isHidden = hebrewEl.classList.contains('hidden');
+        if (exampleEl) exampleEl.classList.toggle('hidden', isHidden);
         if (hintEl) hintEl.style.display = isHidden ? 'block' : 'none';
         if (!isHidden) this._revealed = true;
       }
@@ -669,8 +671,10 @@
           return;
         }
         const hebrewEl = document.getElementById('hebrew-word');
+        const exampleEl = document.getElementById('example-sentence');
         const hintEl = document.getElementById('toggle-hint');
         if (hebrewEl) hebrewEl.classList.remove('hidden');
+        if (exampleEl) exampleEl.classList.remove('hidden');
         if (hintEl) {
           hintEl.textContent = 'עכשיו כשראיתם את התרגום - החליקו שוב ימינה לאישור שאתם יודעים';
           hintEl.style.display = 'block';
@@ -1381,12 +1385,27 @@
         try {
           if (!localStorage.getItem('psychovocab_tutorial_seen')) {
             localStorage.setItem('psychovocab_tutorial_seen', '1');
-            this.showTutorialModal();
+            this.showFirstRunModal();
           }
         } catch (e) {
           // localStorage unavailable (e.g. private browsing) - just skip
           // the auto-popup, the manual "מדריך למתחילים" button still works.
         }
+      }
+
+      // One-time, one-screen welcome for brand-new users - just enough to
+      // start the first session without guessing. The full walkthrough
+      // (showTutorialModal, below) stays available any time from the
+      // "מדריך למתחילים" button for anyone who wants the details.
+      showFirstRunModal() {
+        const content = `
+          <div style="line-height: 1.8; color: var(--text-secondary);">
+            <div style="margin-bottom: 0.7rem;">🃏 מילה באנגלית תופיע על כרטיס - לחצו עליו (או Space) כדי לחשוף את התרגום, ואז סמנו בהחלקה או בכפתורים אם ידעתם.</div>
+            <div style="margin-bottom: 0.7rem;">🚦 כל מילה מתקדמת מאדום → כתום → ירוק (שולט). הרמה (קל/בינוני/קשה) עולה אוטומטית ברגע ששולטים בכל מילות הרמה הנוכחית.</div>
+            <div>⌨️ קיצורי מקלדת: <strong>Space</strong> לחשיפה, <strong>U</strong> לביטול סימון, <strong>B</strong> לחזרה לתפריט.</div>
+          </div>
+        `;
+        this.showModal('👋 ברוכים הבאים ל-PsychoVocab', content);
       }
 
       showTutorialModal() {
@@ -2061,6 +2080,7 @@
                 <button type="button" class="speak-btn" data-word="${this.escapeHtml(word.english)}" onclick="event.stopPropagation(); app.speakWord(this)" aria-label="השמע הגייה" title="השמע הגייה">🔊</button>
               </div>
               <div class="hebrew-translation hidden" id="hebrew-word">${word.hebrew}</div>
+              <div class="example-sentence hidden" id="example-sentence">${word.example || ''}</div>
               <div id="toggle-hint" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">לחץ לגילוי התרגום</div>
               <button onclick="event.stopPropagation(); app.toggleNoteField(${word.id})" style="margin-top: 1.5rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">
                 📝 ${word.association ? 'ערוך רמז אישי' : 'הוסף רמז אישי - אסוציאציה מומלצת'}
@@ -2106,10 +2126,10 @@
               </div>
               <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
                 <button onclick="app.undo()" class="btn btn-secondary">
-                  ↶ ביטול (U)
+                  ↶ ביטול (<strong>U</strong>)
                 </button>
                 <button onclick="app.goBack()" class="btn" style="color: var(--red); border-color: var(--red);">
-                  ← חזור לתפריט (B)
+                  ← חזור לתפריט (<strong>B</strong>)
                 </button>
               </div>
             </div>
