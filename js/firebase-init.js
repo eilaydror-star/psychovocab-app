@@ -31,6 +31,12 @@ function initializeFirebase() {
       currentUser = user;
       if (window.app) {
         window.app.currentUser = user;
+        // First callback resolves whether a previous session is being
+        // restored - flips the boot screen over to the real login/start
+        // screen instead of leaving a stale "loading" state or, worse,
+        // flashing the login form before the restored session is known.
+        const wasChecked = window.app.authChecked;
+        window.app.authChecked = true;
 
         if (user) {
           console.log('User logged in:', user.email);
@@ -42,6 +48,7 @@ function initializeFirebase() {
           window.app.loadProgressFromFirebase();
         } else {
           console.log('No user logged in');
+          if (!wasChecked) window.app.render();
         }
       }
     });
@@ -53,7 +60,9 @@ function initializeFirebase() {
   }
 }
 
-// Initialize Firebase when page loads
-window.addEventListener('load', () => {
-  initializeFirebase();
-});
+// Start the auth check as soon as this script runs (the Firebase SDKs are
+// already loaded via the blocking <script> tags above it in index.html),
+// rather than waiting for the 'load' event - which fires only after every
+// image/font on the page has finished, needlessly delaying how soon a
+// returning user's session is restored.
+initializeFirebase();
