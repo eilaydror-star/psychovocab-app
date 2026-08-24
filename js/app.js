@@ -25,8 +25,23 @@
         this.lastSaved = null;
         this.autoSaveInterval = null;
         this.breakTimerId = null; // Recommends a break after 7 min in one set - see startBreakTimer
+        // Which side the last graded card flew off to (1 = right/correct,
+        // -1 = left/incorrect, null = no grade just happened) - lets the
+        // next card slide in from that same side instead of always using
+        // the generic fade-up, so grading reads as one continuous motion
+        // instead of a swipe followed by an unrelated pop-in. Cleared after
+        // each render so unrelated re-renders (toggling a flag, jumpToWord)
+        // fall back to the plain entrance.
+        this._lastGradeDir = null;
+        this._lastRenderedWordId = null;
         this.currentUser = null; // Firebase user
         this.userSkippedLogin = false; // Track if user skipped login screen
+        // True once we know whether a previous session is being restored:
+        // immediately if Firebase isn't configured (nothing async to wait
+        // on), otherwise only after auth.onAuthStateChanged's first
+        // callback. Gates getScreenType() so a returning user sees a brief
+        // loading screen instead of a flash of the login form.
+        this.authChecked = !firebaseReady;
         
         // Difficulty tier: no manual picker any more - the app always
         // works through 'easy' words first, then automatically starts
@@ -994,12 +1009,14 @@
             } else {
               console.log('No Firebase progress found, using local');
               this.loadProgressFromLocalStorage();
+              this.render();
             }
             this.loadFriends();
           })
           .catch((error) => {
             console.warn('Failed to load from Firebase:', error.message);
             this.loadProgressFromLocalStorage();
+            this.render();
           });
       }
 
@@ -1309,6 +1326,14 @@
       }
       
       getScreenType() {
+        // While Firebase is still resolving whether a previous session
+        // exists, show a loading screen rather than the login form - most
+        // visits are a returning, already-logged-in user, so jumping
+        // straight to 'login' would flash the login form on every load
+        // before immediately flipping to the start screen once auth
+        // resolves.
+        if (!this.authChecked && !this.sessionActive) return 'loading';
+
         // Show the login screen only when there's nothing else to show
         // instead: no logged-in user, login wasn't explicitly skipped, and
         // there's no session already in progress. Without the sessionActive
@@ -1361,6 +1386,11 @@
           history.pushState({ screen: screenType }, '', location.href);
         }
         this._pushedScreen = screenType;
+
+        if (screenType === 'loading') {
+          this.renderLoadingScreen(appContent);
+          return;
+        }
 
         // Check if user needs to login
         // Show login if: Firebase is ready but no user logged in
@@ -1564,6 +1594,18 @@
         deferredInstallPrompt.userChoice.finally(() => {
           deferredInstallPrompt = null;
         });
+      }
+
+      renderLoadingScreen(appContent) {
+        appContent.innerHTML = `
+          <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;">
+            <div style="text-align: center;">
+              <div style="font-size: 2.5rem; margin-bottom: 1rem;">📚</div>
+              <div style="width: 28px; height: 28px; margin: 0 auto; border: 3px solid var(--border-light); border-top-color: var(--sage-green); border-radius: 50%; animation: app-boot-spin 0.8s linear infinite;"></div>
+            </div>
+          </div>
+          <style>@keyframes app-boot-spin { to { transform: rotate(360deg); } }</style>
+        `;
       }
 
       renderLoginScreen(appContent) {
@@ -2108,10 +2150,20 @@
         // Only reset the "has the learner actually seen the translation"
         // flag when a genuinely new word comes on screen - a re-render of
         // the same card (e.g. toggling the flag) shouldn't wipe it out.
-        if (this._revealedForWordId !== word.id) {
+        const isNewWord = this._lastRenderedWordId !== word.id;
+        if (isNewWord) {
           this._revealed = false;
           this._revealedForWordId = word.id;
         }
+        this._lastRenderedWordId = word.id;
+
+        // Only a genuinely new card sliding in right after a grade should
+        // continue that grade's direction - re-renders of the same word
+        // (toggling the flag, editing a note) or jumping to a different
+        // word from the sidebar get the plain fade-up entrance instead.
+        const enterClass = (isNewWord && this._lastGradeDir === 1) ? 'enter-right'
+          : (isNewWord && this._lastGradeDir === -1) ? 'enter-left' : '';
+        if (isNewWord) this._lastGradeDir = null;
 
         // Side list of the whole set currently in play, one row per word,
         // color-coded by the same red/orange/green status shown everywhere
@@ -2148,7 +2200,7 @@
               </div>
             </div>
 
-            <div class="word-card swipe-area" id="current-word-card">
+            <div class="word-card swipe-area ${enterClass}" id="current-word-card">
               <div class="word-emoji">${word.emoji}</div>
               <div class="english-word-row">
                 <span class="english-word">${word.english}</span>
@@ -2676,6 +2728,8 @@
           cardEl.style.opacity = '0';
           cardEl.style.pointerEvents = 'none';
         }
+        if (navigator.vibrate) navigator.vibrate(correct ? 12 : 25);
+        this._lastGradeDir = correct ? 1 : -1;
 
         setTimeout(() => {
           if (correct) {
@@ -2708,6 +2762,8 @@
           cardEl.style.opacity = '0';
           cardEl.style.pointerEvents = 'none';
         }
+        if (navigator.vibrate) navigator.vibrate(12);
+        this._lastGradeDir = 1;
 
         setTimeout(() => {
           this.markWordKnown(word, true);
