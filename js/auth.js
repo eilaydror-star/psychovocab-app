@@ -47,6 +47,19 @@ function signInWithGoogle() {
   });
 }
 
+function resetPassword(email) {
+  return new Promise((resolve, reject) => {
+    if (!firebaseReady) {
+      reject('Firebase not ready');
+      return;
+    }
+
+    auth.sendPasswordResetEmail(email)
+      .then(() => resolve())
+      .catch((error) => reject(error.message));
+  });
+}
+
 function logoutUser() {
   return new Promise((resolve, reject) => {
     if (!firebaseReady) {

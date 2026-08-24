@@ -1577,11 +1577,15 @@
                   </div>
                   
                   <div id="login-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
-                  
+
                   <button onclick="app.handleLogin()" style="width: 100%; padding: 0.75rem; background: var(--sage-green); color: white; border: none; border-radius: 2px; font-size: 1rem; font-weight: 500; cursor: pointer; margin-bottom: 1rem;">
                     כניסה
                   </button>
-                  
+
+                  <p style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                    <a href="#" onclick="app.handleForgotPassword(event)" style="color: var(--teal); text-decoration: none; font-weight: 500;">שכחת סיסמה?</a>
+                  </p>
+
                   <p style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
                     אין לך חשבון? <a href="#" onclick="app.toggleAuthForm(event)" style="color: var(--teal); text-decoration: none; font-weight: 500;">הרשמה</a>
                   </p>
@@ -1684,7 +1688,32 @@
             errorEl.style.display = 'block';
           });
       }
-      
+
+      handleForgotPassword(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById('login-error');
+        const email = document.getElementById('login-email').value;
+
+        if (!email) {
+          errorEl.style.color = 'var(--red)';
+          errorEl.textContent = 'הזן קודם את כתובת הדוא"ל שלך בשדה למעלה';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        resetPassword(email)
+          .then(() => {
+            errorEl.style.color = 'var(--sage-green)';
+            errorEl.textContent = 'נשלח מייל לאיפוס סיסמה ל-' + email;
+            errorEl.style.display = 'block';
+          })
+          .catch((error) => {
+            errorEl.style.color = 'var(--red)';
+            errorEl.textContent = 'שגיאה בשליחת מייל איפוס: ' + error;
+            errorEl.style.display = 'block';
+          });
+      }
+
       handleRegister() {
         const email = document.getElementById('register-email').value;
         const password = document.getElementById('register-password').value;
@@ -2014,13 +2043,34 @@
                   </button>
                 ` : ''}
               </div>
-            ` : ''}
+            ` : `
+              <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light); text-align: center;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 0.75rem;">
+                  אתם משננים במצב אורח - ההתקדמות נשמרת רק במכשיר הזה.
+                </p>
+                <button class="btn btn-primary" onclick="app.showLoginScreen()" style="width: 100%;">
+                  🔐 התחבר / הירשם כדי לשמור בענן
+                </button>
+              </div>
+            `}
           </div>
         `;
-        
+
         appContent.innerHTML = html;
       }
-      
+
+      showLoginScreen() {
+        // Lets a guest ("המשך ללא כניסה") come back to the login/register
+        // gate later - the account section of the main menu has no other
+        // path back to it, see getScreenType(). Doesn't touch any saved
+        // data: a fresh registration finds no existing cloud snapshot and
+        // falls back to the local progress already in localStorage (see
+        // loadProgressFromFirebase), and a login to an existing account
+        // merges by per-word updatedAt, so nothing here is destructive.
+        this.userSkippedLogin = false;
+        this.render();
+      }
+
       renderSession(appContent) {
         // Filter out mastered words (status = 'green') and words now
         // resting after a correct first answer (real spaced repetition -
