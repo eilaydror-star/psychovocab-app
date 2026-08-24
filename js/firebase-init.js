@@ -26,6 +26,18 @@ function initializeFirebase() {
     db = firebase.database();
     firebaseReady = true;
 
+    // Safety net: onAuthStateChanged's first callback can be blocked
+    // indefinitely (third-party storage/IndexedDB restrictions, privacy
+    // extensions, corporate proxies) - without this, getScreenType() would
+    // gate the app on !authChecked forever and leave the user stuck on the
+    // boot spinner with no way to reach the login or start screen.
+    setTimeout(() => {
+      if (window.app && !window.app.authChecked) {
+        window.app.authChecked = true;
+        window.app.render();
+      }
+    }, 4000);
+
     // Listen for auth changes
     auth.onAuthStateChanged((user) => {
       currentUser = user;

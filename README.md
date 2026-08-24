@@ -6,7 +6,7 @@ Live site: https://eilaydror-star.github.io/psychovocab-app/
 
 ## How it works
 
-- 3,500 English↔Hebrew word pairs, split into easy / moderate / hard difficulty tiers
+- 4,000 English↔Hebrew word pairs, split into easy / moderate / hard difficulty tiers
 - A traffic-light system (red → orange → green) tracks mastery per word, using spaced repetition (a word must be answered correctly twice in a row, a few hours apart, to be marked mastered)
 - No manual difficulty picker - the app always works through the easy tier first, and automatically unlocks moderate once every easy word is green, then hard once moderate is green (`getCurrentTier()` in `js/app.js`)
 - Each 7-word study set is drawn only from the user's current tier, from a capped pool of already-started words plus a limited number of never-attempted ones, so a session never surfaces words the user hasn't actually reached yet
@@ -27,7 +27,7 @@ css/
   components.css         buttons, cards, modals, timer, etc.
 js/
   config.js               Firebase project config
-  words-data.js           the 3,500-word dataset
+  words-data.js           the 4,000-word dataset
   storage.js               localStorage read/write helpers
   firebase-init.js         Firebase Auth/Database setup, auth state handling
   auth.js                   register/login/logout
