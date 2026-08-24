@@ -84,7 +84,7 @@
         // key) - Firebase's set() rejects any value containing `undefined`
         // anywhere in the object tree, so every word needs a real value
         // from the start rather than relying on the key being absent.
-        return WORDS_DATA.map(w => ({ ...w, dueAt: null, flagged: false, updatedAt: null }));
+        return WORDS_DATA.map(w => ({ ...w, dueAt: null, flagged: false, updatedAt: null, failCount: 0, leech: false }));
       }
       
       // Which difficulty tier the user is currently working through. There
@@ -111,7 +111,7 @@
         // immediately eligible for selection, so a session could surface a
         // word from anywhere in the whole remaining pool. Now only the
         // current tier is in play at all.
-        const tierWords = this.words.filter(w => w.difficulty === this.getCurrentTier() && w.status !== 'green');
+        const tierWords = this.words.filter(w => w.difficulty === this.getCurrentTier() && w.status !== 'green' && !w.leech);
 
         if (tierWords.length === 0) return;
 
@@ -911,6 +911,8 @@
                 localWord.dueAt = remoteWord.dueAt ?? null;
                 localWord.flagged = remoteWord.flagged ?? false;
                 localWord.updatedAt = remoteWord.updatedAt ?? null;
+                localWord.failCount = remoteWord.failCount ?? 0;
+                localWord.leech = remoteWord.leech ?? false;
               }
             });
 
@@ -995,6 +997,8 @@
                   word.dueAt = saved.dueAt ?? null;
                   word.flagged = saved.flagged ?? false;
                   word.updatedAt = saved.updatedAt ?? null;
+                  word.failCount = saved.failCount ?? 0;
+                  word.leech = saved.leech ?? false;
                 }
               });
 
@@ -1086,7 +1090,7 @@
             const savedStatusMap = {};
             if (savedWords && Array.isArray(savedWords)) {
               savedWords.forEach(w => {
-                savedStatusMap[w.id] = { status: w.status, streak: w.streak, association: w.association, dueAt: w.dueAt, flagged: w.flagged, updatedAt: w.updatedAt };
+                savedStatusMap[w.id] = { status: w.status, streak: w.streak, association: w.association, dueAt: w.dueAt, flagged: w.flagged, updatedAt: w.updatedAt, failCount: w.failCount, leech: w.leech };
               });
             }
 
@@ -1099,6 +1103,8 @@
                 word.dueAt = savedStatusMap[word.id].dueAt ?? null;
                 word.flagged = savedStatusMap[word.id].flagged ?? false;
                 word.updatedAt = savedStatusMap[word.id].updatedAt ?? null;
+                word.failCount = savedStatusMap[word.id].failCount ?? 0;
+                word.leech = savedStatusMap[word.id].leech ?? false;
               }
             });
 
@@ -1145,10 +1151,16 @@
               this.words = data.words;
               this.allTimeStats = data.allTimeStats;
               
-              // Ensure all words have association field (for backwards compatibility)
+              // Ensure all words have association/leech fields (for backwards compatibility)
               this.words.forEach(word => {
                 if (!word.hasOwnProperty('association')) {
                   word.association = '';
+                }
+                if (!word.hasOwnProperty('failCount')) {
+                  word.failCount = 0;
+                }
+                if (!word.hasOwnProperty('leech')) {
+                  word.leech = false;
                 }
               });
               
@@ -1817,21 +1829,36 @@
       
       renderStartScreen(appContent, stats) {
         const allMastered = stats.remaining === 0;
-        
+
         let html = `
           <div class="start-screen">
             <div class="start-title">מוכן לשנן?</div>
             <div class="start-description">
               שולט על מילים באנגלית לבחינת הפסיכומטרי.<br>
               התקדמות כללית: <strong>${stats.mastered}/3500</strong> מילים שולט<br>
-              ${stats.remaining > 0 
-                ? `יש לך <strong>${stats.remaining}</strong> מילים נותרים לשלוט.` 
+              ${stats.remaining > 0
+                ? `יש לך <strong>${stats.remaining}</strong> מילים נותרים לשלוט.`
                 : `ברכות! שלטת בכל 3,500 המילים! 🎉`
               }
             </div>
         `;
-        
-        
+
+        // Nudges a learner back when words they answered correctly once
+        // have finished resting and are ready for the confirmation round
+        // that turns them green - purely informational (no "streak at
+        // risk" framing), since the whole point of the rest period only
+        // pays off if the learner actually comes back for round two.
+        const now = Date.now();
+        const readyCount = this.words.filter(w => w.status === 'orange' && w.dueAt && w.dueAt <= now && !w.leech).length;
+        if (readyCount > 0 && !this.sessionActive) {
+          html += `
+            <div style="background: var(--light-sage); border: 1px solid rgba(74, 122, 90, 0.25); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem; text-align: center;">
+              🔔 <strong>${readyCount}</strong> מילים סיימו לנוח ומוכנות לאישור סופי - זה הזמן הכי טוב לחזור אליהן.
+            </div>
+          `;
+        }
+
+
         // Current-tier banner: no manual difficulty picker any more - the
         // app decides the tier automatically (see getCurrentTier()) and
         // just shows the learner where they stand within it.
@@ -2071,6 +2098,10 @@
 
             <button class="btn btn-secondary" onclick="app.showFlaggedWordsModal()" style="width: 100%; margin-top: 0.75rem;">
               🚩 מילים שסימנתי${this.words.filter(w => w.flagged).length > 0 ? ` (${this.words.filter(w => w.flagged).length})` : ''}
+            </button>
+
+            <button class="btn btn-secondary" onclick="app.showLeechWordsModal()" style="width: 100%; margin-top: 0.75rem;">
+              🐌 מילים עקשניות${this.words.filter(w => w.leech).length > 0 ? ` (${this.words.filter(w => w.leech).length})` : ''}
             </button>
 
             <button class="btn btn-secondary" onclick="app.showMasteredWordsModal()" style="width: 100%; margin-top: 0.75rem;">
@@ -2805,6 +2836,14 @@
         }
         word.updatedAt = Date.now();
 
+        // Reaching mastery clears any leech history - whatever made this
+        // word stubborn before is no longer relevant once it's actually
+        // known. See markWordUnknown() for how a word becomes a leech.
+        if (word.status === 'green') {
+          word.failCount = 0;
+          word.leech = false;
+        }
+
         this.sessionStats.correct++;
         this.allTimeStats.totalAttempts++;
         this.allTimeStats.totalCorrect++;
@@ -2835,6 +2874,20 @@
         // If already red, stay red (no change)
         word.updatedAt = Date.now();
 
+        // Total-fails counter, independent of streak (which only tracks
+        // consecutive correct answers and resets on any miss). A word that
+        // keeps coming back wrong across many separate sessions is a
+        // "leech" - the term Anki uses for this exact pattern - and past
+        // LEECH_THRESHOLD misses it stops being worth the same rotation
+        // time as everything else. See showLeechWordsModal()/
+        // reactivateLeech() for how the learner deals with it, and
+        // startNewSession() for where leeches are excluded from new
+        // sessions.
+        word.failCount = (word.failCount || 0) + 1;
+        const LEECH_THRESHOLD = 4;
+        const justBecameLeech = !word.leech && word.failCount >= LEECH_THRESHOLD;
+        if (justBecameLeech) word.leech = true;
+
         // Send the missed word to the back of this session's queue instead
         // of leaving it at the front - otherwise it would immediately come
         // back up as the next card. It still resurfaces later in the same
@@ -2848,6 +2901,76 @@
         this.allTimeStats.totalAttempts++;
         this.saveProgress();
         this.render();
+
+        if (justBecameLeech) this.showLeechModal(word);
+      }
+
+      // Shown once, the moment a word crosses the leech threshold - not a
+      // scolding, just flagging that the normal two-correct-answers flow
+      // isn't working for this specific word and it's being pulled out of
+      // rotation until the learner deliberately brings it back (see
+      // reactivateLeech()), so it stops eating a disproportionate share of
+      // every future session.
+      showLeechModal(word) {
+        const content = `
+          <div style="text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem;">🐌</div>
+            <p style="font-size: 1.05rem; margin-bottom: 1rem;">
+              <strong>${this.escapeHtml(word.english)}</strong> (${this.escapeHtml(word.hebrew)}) פספסת כבר ${word.failCount} פעמים.
+            </p>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.7;">
+              במקום להמשיך לחזור עליה בלי הצלחה, היא יוצאת זמנית מהסבבים הרגילים. אפשר להוסיף לה רמז אישי ולהחזיר אותה לשינון מ"מילים עקשניות" במסך הראשי כשתרצו.
+            </p>
+            <button class="btn btn-primary" onclick="app.closeModal()">הבנתי</button>
+          </div>
+        `;
+        this.showModal('🐌 מילה עקשנית', content);
+      }
+
+      // Brings a leech word back into normal rotation - a deliberate,
+      // learner-initiated reset (not automatic), since the whole point is
+      // that this word needs a fresh approach, not just another silent
+      // retry.
+      reactivateLeech(wordId) {
+        const word = this.words.find(w => w.id === wordId);
+        if (!word) return;
+        word.leech = false;
+        word.failCount = 0;
+        word.updatedAt = Date.now();
+        this.saveProgress();
+        this.render();
+        this.showLeechWordsModal();
+      }
+
+      showLeechWordsModal() {
+        const leeches = this.words.filter(w => w.leech);
+        let content;
+        if (leeches.length === 0) {
+          content = `
+            <p style="text-align: center; color: var(--text-secondary);">
+              אין כרגע מילים עקשניות. מילה שפוספסה כמה פעמים ברציפות תופיע כאן, יחד עם אפשרות להוסיף לה רמז אישי ולהחזיר אותה לשינון.
+            </p>
+          `;
+        } else {
+          content = `
+            <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+              המילים האלה יצאו זמנית מהסבבים הרגילים כי הן פוספסו הרבה פעמים. הוסיפו רמז אישי ולחצו "החזר לשינון" כשתרצו לנסות שוב.
+            </p>
+            <div style="max-height: 55vh; overflow-y: auto;">
+              ${leeches.map(w => `
+                <div style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-light);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <div><strong>${this.escapeHtml(w.english)}</strong> - ${this.escapeHtml(w.hebrew)}</div>
+                    <span style="color: var(--red); font-weight: 600; font-size: 0.8rem; flex-shrink: 0;">${w.failCount} פספוסים</span>
+                  </div>
+                  <textarea id="leech-assoc-${w.id}" placeholder="💭 כתוב דרך להיזכר..." style="width: 100%; padding: 0.5rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 10px; min-height: 45px; margin-bottom: 0.5rem;" onchange="app.updateAssociation(${w.id}, this.value)">${w.association || ''}</textarea>
+                  <button onclick="app.reactivateLeech(${w.id})" class="btn btn-sm btn-secondary" style="width: 100%;">🔄 החזר לשינון</button>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+        this.showModal('🐌 מילים עקשניות', content);
       }
       
       renderSessionEnd(appContent) {
