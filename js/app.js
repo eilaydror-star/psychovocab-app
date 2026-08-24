@@ -122,11 +122,16 @@
         // previously missed) are always eligible; new words fill in the
         // remaining room, most exam-relevant first, so new material is
         // introduced gradually as older words get mastered and free up room.
+        // Ties (same testProbability) are shuffled rather than sorted by id,
+        // since id order reflects when a word was added to the dataset, not
+        // its difficulty - sorting by id let the ~500 beginner words added
+        // in bulk (all high, sequential ids) cluster solidly at the front
+        // of every learner's queue instead of blending in with the rest.
         const ACTIVE_POOL_SIZE = 30;
         const started = tierWords.filter(w => w.updatedAt !== null);
         const notStarted = tierWords
           .filter(w => w.updatedAt === null)
-          .sort((a, b) => b.testProbability - a.testProbability || a.id - b.id);
+          .sort((a, b) => b.testProbability - a.testProbability || Math.random() - 0.5);
         const activeNotStarted = notStarted.slice(0, Math.max(0, ACTIVE_POOL_SIZE - started.length));
         const pool = [...started, ...activeNotStarted];
 
