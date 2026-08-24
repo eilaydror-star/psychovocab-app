@@ -1844,10 +1844,10 @@
             <div class="start-title">מוכן לשנן?</div>
             <div class="start-description">
               שולט על מילים באנגלית לבחינת הפסיכומטרי.<br>
-              התקדמות כללית: <strong>${stats.mastered}/3500</strong> מילים שולט<br>
+              התקדמות כללית: <strong>${stats.mastered}/${this.words.length}</strong> מילים שולט<br>
               ${stats.remaining > 0
                 ? `יש לך <strong>${stats.remaining}</strong> מילים נותרים לשלוט.`
-                : `ברכות! שלטת בכל 3,500 המילים! 🎉`
+                : `ברכות! שלטת בכל ${this.words.length.toLocaleString('he-IL')} המילים! 🎉`
               }
             </div>
         `;
@@ -3010,7 +3010,7 @@
 
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem; text-align: center;">
                 <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">התקדמות כללית</div>
-                <div style="font-size: 2rem; font-weight: 600; color: var(--teal);">${overallStats.mastered} / 3500</div>
+                <div style="font-size: 2rem; font-weight: 600; color: var(--teal);">${overallStats.mastered} / ${this.words.length}</div>
                 <div style="font-size: 0.85rem; color: var(--text-secondary);">מילים שולט</div>
               </div>
               
