@@ -489,6 +489,16 @@
   background: var(--light-sage);
 }
 
+.session-word-item.clickable {
+  cursor: pointer;
+}
+
+.session-word-item.clickable:hover,
+.session-word-item.clickable:focus-visible {
+  background: var(--bg-card-hover);
+  color: var(--dark-navy);
+}
+
 /* One-click "mark as fully known" - deliberately plain/text-like (not a
    filled circle like the two grade buttons above it) so it never reads as
    a third equally-weighted answer option; the confirm() dialog wired to it

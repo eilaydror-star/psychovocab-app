@@ -649,6 +649,21 @@
         );
       }
 
+      // Lets the learner jump straight to any other due word shown in the
+      // side list, instead of only ever seeing whichever one happens to be
+      // first. Both renderSession() and getCurrentSessionWord() always show
+      // currentSession's first active match, so moving the chosen word to
+      // the front of the array is all that's needed - no separate "which
+      // word is on screen" state to keep in sync.
+      jumpToWord(wordId) {
+        const idx = this.currentSession.findIndex(w => w.id === wordId);
+        if (idx <= 0) return;
+        const [word] = this.currentSession.splice(idx, 1);
+        this.currentSession.unshift(word);
+        this._revealed = false;
+        this.render();
+      }
+
       toggleTranslation() {
         const hebrewEl = document.getElementById('hebrew-word');
         const exampleEl = document.getElementById('example-sentence');
@@ -2103,12 +2118,22 @@
         // else - lets the learner see at a glance what's left before this
         // set is done. Rebuilt on every render() call, so it updates live
         // the moment a word's status changes (see markWordKnown/Unknown).
-        const sideListHtml = this.currentSession.map(w => `
-          <li class="session-word-item ${w.id === word.id ? 'active' : ''}">
+        // Only words currently "active" (due now, not yet mastered) can be
+        // jumped to - clicking a resting/mastered word wouldn't have
+        // anything sensible to show, since renderSession would just filter
+        // it back out again.
+        const activeIds = new Set(activeWords.map(w => w.id));
+        const sideListHtml = this.currentSession.map(w => {
+          const isCurrent = w.id === word.id;
+          const isClickable = !isCurrent && activeIds.has(w.id);
+          return `
+          <li class="session-word-item ${isCurrent ? 'active' : ''} ${isClickable ? 'clickable' : ''}"
+              ${isClickable ? `onclick="app.jumpToWord(${w.id})" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.jumpToWord(${w.id})}"` : ''}>
             <span class="status-dot ${w.status || 'red'}"></span>
             <span>${w.english}</span>
           </li>
-        `).join('');
+        `;
+        }).join('');
 
         let html = `
           <div class="session-container">
