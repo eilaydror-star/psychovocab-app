@@ -1081,7 +1081,16 @@
       loadState() {
         const data = loadFromLocalStorage();
         if (data) {
-          
+            // Having any saved local progress means this device was
+            // already used as a guest before - treat it the same as
+            // having explicitly clicked "continue without login", so
+            // finishing a resumed session (or any later render, once
+            // sessionActive goes back to false) lands on the start
+            // screen instead of bouncing back to the login form. Without
+            // this, only the in-memory flag set by clicking the button
+            // covered that case, which resets on every page load.
+            this.userSkippedLogin = true;
+
             // Keep fresh words but apply saved progress to them
             const savedWords = data.words;
             const freshWords = this.words;
