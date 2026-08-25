@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>PsychoVocab - Tests</title>
+  <style>
+    body { font-family: monospace; padding: 1.5rem; background: #111; color: #eee; }
+    .pass { color: #6f6; }
+    .fail { color: #f66; font-weight: bold; }
+    #summary { font-size: 1.2rem; margin-bottom: 1rem; }
+    li { margin-bottom: 0.4rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>PsychoVocab logic tests</h1>
+  <p>Open this file directly (or serve the project) after changing js/app.js to check the spaced-repetition,
+     tier, and leech logic haven't regressed. Not a full DOM/UI test - just the core state machine.</p>
+  <div id="summary">Running...</div>
+  <ul id="results"></ul>
+
+  <!-- Same markup app.js's render() reaches for by id, so a full app boot
+       (including render()) doesn't throw before the test runner takes over. -->
+  <div class="stats-container">
+    <div class="stat-card"><div class="stat-value" id="total-mastered">0</div></div>
+    <div class="stat-card"><div class="stat-value" id="total-remaining">0</div></div>
+    <div class="stat-card"><div class="stat-value" id="current-streak">0</div></div>
+    <div class="stat-card"><div class="stat-value" id="sessions-today">0</div></div>
+  </div>
+  <div id="app-content"></div>
+  <div id="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header" id="modal-title"></div>
+      <div class="modal-content" id="modal-body"></div>
+    </div>
+  </div>
+  <input type="file" id="file-import" accept=".json">
+
+  <!-- Real app scripts, no Firebase SDK loaded - firebase-init.js's
+       firebase.initializeApp() throws (firebase is undefined), which it
+       already catches and treats as "Firebase not configured", so the app
+       falls back to plain localStorage exactly like a browser with the
+       Firebase SDK blocked/offline would. -->
+  <script src="../js/config.js"></script>
+  <script src="../js/words-data.js"></script>
+  <script src="../js/storage.js"></script>
+  <script src="../js/firebase-init.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/app.js"></script>
+
+  <script>
+    // --- tiny test runner -----------------------------------------------
+    const results = [];
+    function test(name, fn) {
+      try {
+        fn();
+        results.push({ name, pass: true });
+      } catch (e) {
+        results.push({ name, pass: false, error: e.message });
+      }
+    }
+    function assert(cond, msg) {
+      if (!cond) throw new Error(msg || 'assertion failed');
+    }
+    function assertEqual(actual, expected, msg) {
+      if (actual !== expected) {
+        throw new Error(`${msg || 'not equal'}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+      }
+    }
+
+    // --- fixtures ----------------------------------------------------------
+    function makeWord(overrides) {
+      return Object.assign({
+        id: Math.random(),
+        english: 'test', hebrew: 'בדיקה', example: 'A test sentence.', emoji: '📚',
+        status: 'red', streak: 0, association: '', difficulty: 'easy', testProbability: 0.5,
+        dueAt: null, flagged: false, updatedAt: null, failCount: 0, leech: false
+      }, overrides);
+    }
+
+    // app is booted for real by app.js (see `window.app = app` at the end
+    // of js/app.js) - silence the side effects we don't want firing
+    // between isolated test cases (re-render, modals, Firebase writes,
+    // which are already no-ops since Firebase isn't loaded here).
+    app.render = () => {};
+    app.saveProgress = () => {};
+    app.showLeechModal = () => {};
+    app.showTierUnlockedModal = () => {};
+    app.showRestingModal = () => {};
+    app.recordStudySession = () => {};
+    app.startBreakTimer = () => {};
+
+    // ==== getCurrentTier ====================================================
+
+    test('getCurrentTier: fresh data starts on easy', () => {
+      app.words = [makeWord({ difficulty: 'easy', status: 'red' })];
+      assertEqual(app.getCurrentTier(), 'easy');
+    });
+
+    test('getCurrentTier: advances once every easy word is green', () => {
+      app.words = [
+        makeWord({ difficulty: 'easy', status: 'green' }),
+        makeWord({ difficulty: 'moderate', status: 'red' })
+      ];
+      assertEqual(app.getCurrentTier(), 'moderate');
+    });
+
+    test('getCurrentTier: a lone leech word does not block the tier from advancing', () => {
+      // Regression: a leech word can never turn green (leeching only
+      // happens on repeated wrong answers), so requiring every word to be
+      // green would strand the learner on this tier forever once any word
+      // becomes a leech - see js/app.js getCurrentTier().
+      app.words = [
+        makeWord({ difficulty: 'easy', status: 'green' }),
+        makeWord({ difficulty: 'easy', status: 'red', leech: true }),
+        makeWord({ difficulty: 'moderate', status: 'red' })
+      ];
+      assertEqual(app.getCurrentTier(), 'moderate');
+    });
+
+    test('getCurrentTier: an ordinary (non-leech) unfinished word still blocks the tier', () => {
+      app.words = [
+        makeWord({ difficulty: 'easy', status: 'green' }),
+        makeWord({ difficulty: 'easy', status: 'red', leech: false }),
+        makeWord({ difficulty: 'moderate', status: 'red' })
+      ];
+      assertEqual(app.getCurrentTier(), 'easy');
+    });
+
+    test('startNewSession: does not silently no-op when the only non-green easy word is a leech', () => {
+      // Regression: startNewSession() excludes leeches from its pool, so if
+      // getCurrentTier() still reported 'easy' here, tierWords would be
+      // empty and the session would fail to start with no feedback at all.
+      app.words = [
+        makeWord({ difficulty: 'easy', status: 'green' }),
+        makeWord({ difficulty: 'easy', status: 'red', leech: true }),
+        makeWord({ difficulty: 'moderate', status: 'red' }),
+        makeWord({ difficulty: 'moderate', status: 'red' })
+      ];
+      app.sessionActive = false;
+      app.currentSession = [];
+      app.startNewSession();
+      assert(app.currentSession.length > 0, 'expected a session to start');
+      assert(app.currentSession.every(w => w.difficulty === 'moderate'), 'expected words drawn from the moderate tier');
+    });
+
+    // ==== markWordUnknown / leech threshold =================================
+
+    test('markWordUnknown: word becomes a leech after 4 total fails and leaves the session', () => {
+      const w = makeWord({ status: 'red', failCount: 3 });
+      app.currentSession = [w];
+      app.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
+      app.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+      app.markWordUnknown(w);
+      assertEqual(w.failCount, 4);
+      assert(w.leech === true, 'expected word to become a leech at failCount 4');
+      assertEqual(app.currentSession.length, 0, 'expected the leech to be pulled out of the session, not requeued');
+    });
+
+    test('markWordUnknown: below the leech threshold, the word is requeued to the back', () => {
+      const w = makeWord({ status: 'orange', failCount: 0 });
+      const other = makeWord({ status: 'red' });
+      app.currentSession = [w, other];
+      app.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
+      app.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+      app.markWordUnknown(w);
+      assertEqual(w.status, 'red', 'orange -> red on a miss');
+      assertEqual(w.leech, false);
+      assertEqual(app.currentSession[app.currentSession.length - 1], w, 'expected the missed word at the back of the queue');
+    });
+
+    // ==== markWordKnown / spaced repetition =================================
+
+    test('markWordKnown: first correct answer rests for ~4 hours (red -> orange)', () => {
+      const w = makeWord({ status: 'red' });
+      app.currentSession = [w];
+      const before = Date.now();
+      app.markWordKnown(w);
+      assertEqual(w.status, 'orange');
+      assertEqual(w.streak, 1);
+      const fourHours = 4 * 60 * 60 * 1000;
+      assert(Math.abs(w.dueAt - (before + fourHours)) < 5000, 'expected dueAt ~4h from now');
+    });
+
+    test('markWordKnown: second correct answer masters the word (orange -> green)', () => {
+      const w = makeWord({ status: 'orange', streak: 1 });
+      app.currentSession = [w];
+      app.markWordKnown(w);
+      assertEqual(w.status, 'green');
+      assertEqual(w.streak, 2);
+      assertEqual(w.dueAt, null);
+    });
+
+    test('markWordKnown: forceMaster jumps straight to green from red', () => {
+      const w = makeWord({ status: 'red' });
+      app.currentSession = [w];
+      app.markWordKnown(w, true);
+      assertEqual(w.status, 'green');
+      assertEqual(w.streak, 2);
+      assertEqual(w.dueAt, null);
+    });
+
+    test('markWordKnown: reaching green clears prior leech history', () => {
+      const w = makeWord({ status: 'orange', streak: 1, leech: true, failCount: 5 });
+      app.currentSession = [w];
+      app.markWordKnown(w);
+      assertEqual(w.status, 'green');
+      assertEqual(w.leech, false, 'mastering a word should clear its leech flag');
+    });
+
+    // ==== weightedRandomSelection ============================================
+
+    test('weightedRandomSelection: returns exactly `count` unique words when enough are available', () => {
+      const pool = Array.from({ length: 10 }, () => makeWord({ testProbability: 0.5 }));
+      const selected = app.weightedRandomSelection(pool, 7);
+      assertEqual(selected.length, 7);
+      assertEqual(new Set(selected.map(w => w.id)).size, 7, 'expected no duplicate words');
+    });
+
+    test('weightedRandomSelection: returns every word when count exceeds the pool size', () => {
+      const pool = Array.from({ length: 3 }, () => makeWord({ testProbability: 0.9 }));
+      const selected = app.weightedRandomSelection(pool, 7);
+      assertEqual(selected.length, 3);
+    });
+
+    // ==== renderSessionEnd summary text ======================================
+
+    test('renderSessionEnd: an emptied session (last word pulled out as a leech) does not claim "mastered"', () => {
+      // Regression: totalWords - masteredInSession both being 0 previously
+      // hit the "mastered everything" branch, which is backwards - the
+      // word left because it became a leech, not because it was mastered.
+      app.currentSession = [];
+      app.sessionStats = { correct: 0, incorrect: 1, streak: 0 };
+      const container = document.createElement('div');
+      app.renderSessionEnd(container);
+      assert(!container.innerHTML.includes('שלטת בכל <strong>0</strong>'), 'should not claim 0 words were mastered as a celebration');
+      assert(container.innerHTML.includes('עקשנית'), 'should explain the word became a leech');
+    });
+
+    test('renderSessionEnd: a normal finished session still reports mastered count', () => {
+      const w1 = makeWord({ status: 'green' });
+      const w2 = makeWord({ status: 'green' });
+      app.currentSession = [w1, w2];
+      app.sessionStats = { correct: 2, incorrect: 0, streak: 2 };
+      const container = document.createElement('div');
+      app.renderSessionEnd(container);
+      assert(container.innerHTML.includes('שלטת בכל <strong>2</strong>'), 'expected the normal "mastered all N" message');
+    });
+
+    // --- report --------------------------------------------------------
+    const list = document.getElementById('results');
+    let passCount = 0;
+    for (const r of results) {
+      const li = document.createElement('li');
+      if (r.pass) {
+        passCount++;
+        li.className = 'pass';
+        li.textContent = `✓ ${r.name}`;
+      } else {
+        li.className = 'fail';
+        li.textContent = `✗ ${r.name}\n  ${r.error}`;
+      }
+      list.appendChild(li);
+    }
+    const summary = document.getElementById('summary');
+    summary.textContent = `${passCount}/${results.length} passed`;
+    summary.className = passCount === results.length ? 'pass' : 'fail';
+    console.log(`TESTS: ${passCount}/${results.length} passed`);
+    if (passCount !== results.length) {
+      console.error('TESTS FAILED', results.filter(r => !r.pass));
+    }
+  </script>
+</body>
+</html>

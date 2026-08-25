@@ -139,7 +139,12 @@
         for (const tier of tiers) {
           const tierWords = this.words.filter(w => w.difficulty === tier);
           if (tierWords.length === 0) continue; // no words at this tier - skip it
-          const allMastered = tierWords.every(w => w.status === 'green');
+          // Leeches are parked out of rotation, not mastered - but a
+          // learner shouldn't be stuck on a tier forever just because one
+          // stubborn word hasn't been reactivated. Treat them like green
+          // for the purposes of "is this tier done" so the next tier still
+          // unlocks (and startNewSession's pool doesn't go empty).
+          const allMastered = tierWords.every(w => w.status === 'green' || w.leech);
           if (!allMastered) return tier;
         }
         return 'hard'; // everything mastered - nothing left to advance to
@@ -936,50 +941,68 @@
 
         const userProgressRef = db.ref(`users/${currentUser.uid}/progress`);
 
-        // Read the cloud copy first and merge per-word by updatedAt, instead
-        // of blindly overwriting it. Without this, two devices open at the
-        // same time (or one device with a stale in-memory copy) would have
-        // whichever one saves last silently erase the other's progress on
-        // words it never even touched.
-        userProgressRef.once('value')
-          .then((snapshot) => {
-            const remoteWords = snapshot.exists() ? (snapshot.val().words || []) : [];
-            const remoteMap = {};
-            remoteWords.forEach(w => { remoteMap[w.id] = w; });
+        // Merge per-word by updatedAt inside a transaction, instead of a
+        // plain read-then-set. A plain once('value') read followed by a
+        // separate set() leaves a window where a second device's write
+        // (e.g. two tabs both auto-saving on their 30s interval) lands in
+        // between the read and the write here - that write would then be
+        // silently clobbered, even though it merged fine against what this
+        // device read moments earlier. transaction() re-runs the merge
+        // against whatever is actually on the server at write time, so a
+        // late-arriving concurrent write can't be lost this way.
+        userProgressRef.transaction((remoteData) => {
+          const remoteWords = (remoteData && remoteData.words) || [];
+          const remoteMap = {};
+          remoteWords.forEach(w => { remoteMap[w.id] = w; });
 
-            this.words.forEach(localWord => {
-              const remoteWord = remoteMap[localWord.id];
-              if (remoteWord && (remoteWord.updatedAt || 0) > (localWord.updatedAt || 0)) {
-                // The cloud has a newer change for this word (made on
-                // another device) - take it instead of overwriting it.
-                localWord.status = remoteWord.status;
-                localWord.streak = remoteWord.streak;
-                localWord.association = remoteWord.association;
-                localWord.dueAt = remoteWord.dueAt ?? null;
-                localWord.flagged = remoteWord.flagged ?? false;
-                localWord.updatedAt = remoteWord.updatedAt ?? null;
-                localWord.failCount = remoteWord.failCount ?? 0;
-                localWord.leech = remoteWord.leech ?? false;
-              }
-            });
+          const mergedWords = this.words.map(localWord => {
+            const remoteWord = remoteMap[localWord.id];
+            if (remoteWord && (remoteWord.updatedAt || 0) > (localWord.updatedAt || 0)) {
+              // The cloud has a newer change for this word (made on
+              // another device) - take it instead of overwriting it.
+              return {
+                ...localWord,
+                status: remoteWord.status,
+                streak: remoteWord.streak,
+                association: remoteWord.association,
+                dueAt: remoteWord.dueAt ?? null,
+                flagged: remoteWord.flagged ?? false,
+                updatedAt: remoteWord.updatedAt ?? null,
+                failCount: remoteWord.failCount ?? 0,
+                leech: remoteWord.leech ?? false
+              };
+            }
+            return localWord;
+          });
 
-            const progressData = {
-              words: this.words,
-              allTimeStats: this.allTimeStats,
-              currentStreak: this.currentStreak,
-              sessionsToday: this.sessionsToday,
-              lastStudyDate: this.lastStudyDate,
-              studyHistory: this.studyHistory,
-              sessionActive: this.sessionActive,
-              sessionWordIds: this.currentSession.map(w => w.id),
-              sessionStats: this.sessionStats,
-              lastSaved: new Date().toISOString(),
-              lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
-            };
-
-            return userProgressRef.set(progressData);
-          })
-          .then(() => {
+          return {
+            words: mergedWords,
+            allTimeStats: this.allTimeStats,
+            currentStreak: this.currentStreak,
+            sessionsToday: this.sessionsToday,
+            lastStudyDate: this.lastStudyDate,
+            studyHistory: this.studyHistory,
+            sessionActive: this.sessionActive,
+            sessionWordIds: this.currentSession.map(w => w.id),
+            sessionStats: this.sessionStats,
+            lastSaved: new Date().toISOString(),
+            lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
+          };
+        })
+          .then((result) => {
+            // Reflect whatever the transaction actually committed (it may
+            // have merged in another device's newer per-word changes) back
+            // into the in-memory word list, so this tab's UI/local state
+            // stays consistent with what's now on the server.
+            if (result.committed && result.snapshot.exists()) {
+              const committedWords = result.snapshot.val().words || [];
+              const committedMap = {};
+              committedWords.forEach(w => { committedMap[w.id] = w; });
+              this.words.forEach(localWord => {
+                const committedWord = committedMap[localWord.id];
+                if (committedWord) Object.assign(localWord, committedWord);
+              });
+            }
             console.log('Progress synced to Firebase');
             this.updatePublicProfile();
           })
@@ -3115,7 +3138,13 @@
         // app, so the summary must reflect which of the two actually happened.
         const masteredInSession = this.currentSession.filter(w => w.status === 'green').length;
         const restingInSession = totalWords - masteredInSession;
-        const summaryText = restingInSession === 0
+        // totalWords can hit 0 mid-session: the only word left in rotation
+        // was pulled out entirely the moment it crossed the leech threshold
+        // (see markWordUnknown) rather than requeued, so there's nothing
+        // left to call "mastered" here.
+        const summaryText = totalWords === 0
+          ? `מילה אחת סומנה כ"עקשנית" ויצאה מהסבב - אפשר להחזיר אותה לשינון דרך "מילים עקשניות" בתפריט.`
+          : restingInSession === 0
           ? `שלטת בכל <strong>${totalWords}</strong> מילים בהישיבה זו! 🎉`
           : masteredInSession === 0
             ? `סיימת סבב על <strong>${totalWords}</strong> מילים! הן ינוחו כמה שעות ואז יחזרו לאישור סופי.`

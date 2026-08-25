@@ -47,3 +47,7 @@ No build step. Either:
 ## Firebase
 
 Project: `psychometric-app-englishwords`. The config in `js/config.js` is not a secret (Firebase web configs are always public in shipped JS) - the actual security boundary is the Realtime Database rules, which restrict each user to reading/writing only their own `users/{uid}/progress` path.
+
+## Tests
+
+`tests/test.html` boots the real app (no Firebase SDK loaded, so it falls back to localStorage) and runs a small suite against the tier/spaced-repetition/leech logic in `js/app.js`. Open it directly, or via a static server, and check the console/page for `N/N passed`. Same no-build philosophy as the app itself - no Node or package manager required.
