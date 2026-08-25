@@ -246,6 +246,158 @@
       assert(container.innerHTML.includes('שלטת בכל <strong>2</strong>'), 'expected the normal "mastered all N" message');
     });
 
+    // ==== startNewSession pool selection =====================================
+
+    // startNewSession() builds its candidate pool inline rather than via a
+    // separate method, so to test the pool itself (not just whatever 7
+    // words randomly end up in the session) we swap out
+    // weightedRandomSelection for the duration of one test to capture
+    // exactly which words it was handed, then restore the real method.
+    function captureSessionPool(setup) {
+      let captured = null;
+      app.weightedRandomSelection = (words, count) => {
+        captured = words;
+        return words.slice(0, count);
+      };
+      try {
+        setup();
+        app.sessionActive = false;
+        app.currentSession = [];
+        app.startNewSession();
+      } finally {
+        delete app.weightedRandomSelection; // fall back to the real prototype method
+      }
+      return captured;
+    }
+
+    test('startNewSession pool: includes every already-started word plus room for new ones', () => {
+      const started = Array.from({ length: 5 }, (_, i) => makeWord({ id: `started-${i}`, difficulty: 'easy', status: 'red', updatedAt: Date.now() }));
+      const notStarted = Array.from({ length: 10 }, (_, i) => makeWord({ id: `new-${i}`, difficulty: 'easy', status: 'red', updatedAt: null }));
+      const pool = captureSessionPool(() => { app.words = [...started, ...notStarted]; });
+      assert(pool !== null, 'expected startNewSession to reach weightedRandomSelection');
+      assertEqual(pool.length, 15, 'expected all 5 started + all 10 new words (well under the 30-word active-pool cap)');
+    });
+
+    test('startNewSession pool: caps brand-new words once started words alone fill the active pool', () => {
+      // ACTIVE_POOL_SIZE is 30 - once 30 already-started words exist, there
+      // is no room left for the "introduce new material gradually" slice,
+      // so no never-attempted word should be pulled in at all.
+      const started = Array.from({ length: 30 }, (_, i) => makeWord({ id: `started-${i}`, difficulty: 'easy', status: 'red', updatedAt: Date.now() }));
+      const notStarted = Array.from({ length: 5 }, (_, i) => makeWord({ id: `new-${i}`, difficulty: 'easy', status: 'red', updatedAt: null }));
+      const pool = captureSessionPool(() => { app.words = [...started, ...notStarted]; });
+      assertEqual(pool.length, 30, 'expected only the 30 started words, no new ones squeezed in');
+      assert(pool.every(w => String(w.id).startsWith('started-')), 'no never-attempted word should appear once the active pool is already full');
+    });
+
+    test('startNewSession pool: excludes leech words even when otherwise due', () => {
+      const leeches = Array.from({ length: 2 }, (_, i) => makeWord({ id: `leech-${i}`, difficulty: 'easy', status: 'red', leech: true, updatedAt: Date.now() }));
+      const normal = Array.from({ length: 3 }, (_, i) => makeWord({ id: `normal-${i}`, difficulty: 'easy', status: 'red', updatedAt: Date.now() }));
+      const pool = captureSessionPool(() => { app.words = [...leeches, ...normal]; });
+      assertEqual(pool.length, 3, 'expected only the 3 non-leech words');
+      assert(pool.every(w => !w.leech), 'no leech word should ever enter the candidate pool');
+    });
+
+    test('startNewSession pool: a resting orange word (dueAt in the future) is not due yet', () => {
+      const resting = makeWord({ id: 'resting', difficulty: 'easy', status: 'orange', updatedAt: Date.now(), dueAt: Date.now() + 60 * 60 * 1000 });
+      const due = makeWord({ id: 'due', difficulty: 'easy', status: 'orange', updatedAt: Date.now(), dueAt: Date.now() - 1000 });
+      const pool = captureSessionPool(() => { app.words = [resting, due]; });
+      assertEqual(pool.length, 1, 'expected only the word whose rest period has already passed');
+      assertEqual(pool[0].id, 'due');
+    });
+
+    // ==== session resume: restoreSession / loadState =========================
+
+    test('restoreSession: resumes the saved words in the saved order', () => {
+      const words = [makeWord({ id: 1 }), makeWord({ id: 2 }), makeWord({ id: 3 })];
+      const data = { sessionActive: true, sessionWordIds: [3, 1], sessionStats: { correct: 2, incorrect: 1, streak: 1 } };
+      app.restoreSession(data, words);
+      assertEqual(app.sessionActive, true);
+      assertEqual(app.currentSession.map(w => w.id).join(','), '3,1', 'expected the exact saved order to be preserved');
+      assertEqual(app.sessionStats.correct, 2);
+    });
+
+    test('restoreSession: sessionActive:false in the saved data means nothing to resume', () => {
+      const words = [makeWord({ id: 1 }), makeWord({ id: 2 })];
+      app.restoreSession({ sessionActive: false, sessionWordIds: [1, 2] }, words);
+      assertEqual(app.sessionActive, false);
+      assertEqual(app.currentSession.length, 0);
+    });
+
+    test('restoreSession: a saved session whose words no longer exist resumes as empty, not a crash', () => {
+      // e.g. the word dataset changed between visits and those ids are gone.
+      const words = [makeWord({ id: 1 })];
+      app.restoreSession({ sessionActive: true, sessionWordIds: [999, 998] }, words);
+      assertEqual(app.sessionActive, false);
+      assertEqual(app.currentSession.length, 0);
+    });
+
+    // loadState() reads from the real localStorage under STORAGE_KEY (see
+    // js/storage.js) - the same key the live app uses to persist actual
+    // progress. Back up and restore it around every test here so running
+    // this suite can never destroy real saved progress on this device.
+    function withSavedLocalStorage(fn) {
+      const backup = localStorage.getItem(STORAGE_KEY);
+      try {
+        fn();
+      } finally {
+        if (backup === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, backup);
+      }
+    }
+
+    test('loadState: merges saved per-word progress onto the current words by id', () => {
+      withSavedLocalStorage(() => {
+        app.words = [makeWord({ id: 1, status: 'red', streak: 0 }), makeWord({ id: 2, status: 'red', streak: 0 })];
+        saveToLocalStorage({
+          words: [{ id: 1, status: 'green', streak: 2, association: 'x', dueAt: null, flagged: false, updatedAt: 123, failCount: 0, leech: false }],
+          allTimeStats: { totalAttempts: 5, totalCorrect: 3 },
+          currentStreak: 2, sessionsToday: 1, lastStudyDate: '2026-08-01', studyHistory: {},
+          lastSaved: new Date().toISOString(), sessionActive: false, sessionWordIds: []
+        });
+        app.userSkippedLogin = false;
+        app.loadState();
+        assertEqual(app.words.find(w => w.id === 1).status, 'green', 'saved progress should apply to the matching word');
+        assertEqual(app.words.find(w => w.id === 2).status, 'red', 'a word absent from the save should keep its current state, not be reset');
+        assertEqual(app.allTimeStats.totalAttempts, 5);
+        assertEqual(app.userSkippedLogin, true, 'having any saved local progress implies a guest has used this device before');
+      });
+    });
+
+    test('loadState: resumes an in-progress session, with the merged word data already applied', () => {
+      withSavedLocalStorage(() => {
+        app.words = [makeWord({ id: 10, status: 'red' }), makeWord({ id: 11, status: 'red' })];
+        saveToLocalStorage({
+          words: [
+            { id: 10, status: 'orange', streak: 1, association: '', dueAt: null, flagged: false, updatedAt: Date.now(), failCount: 0, leech: false },
+            { id: 11, status: 'red', streak: 0, association: '', dueAt: null, flagged: false, updatedAt: null, failCount: 0, leech: false }
+          ],
+          allTimeStats: { totalAttempts: 1, totalCorrect: 1 },
+          currentStreak: 1, sessionsToday: 1, lastStudyDate: '2026-08-01', studyHistory: {},
+          lastSaved: new Date().toISOString(), sessionActive: true, sessionWordIds: [10, 11],
+          sessionStats: { correct: 1, incorrect: 0, streak: 1 }
+        });
+        app.loadState();
+        assertEqual(app.sessionActive, true);
+        assertEqual(app.currentSession.map(w => w.id).join(','), '10,11');
+        assertEqual(app.currentSession[0].status, 'orange', 'the resumed session should reference the already-merged word data');
+      });
+    });
+
+    test('loadState: a saved session referencing since-removed words does not resume', () => {
+      withSavedLocalStorage(() => {
+        app.words = [makeWord({ id: 20, status: 'red' })];
+        saveToLocalStorage({
+          words: [{ id: 20, status: 'red', streak: 0, association: '', dueAt: null, flagged: false, updatedAt: null, failCount: 0, leech: false }],
+          allTimeStats: { totalAttempts: 0, totalCorrect: 0 },
+          currentStreak: 0, sessionsToday: 0, lastStudyDate: null, studyHistory: {},
+          lastSaved: new Date().toISOString(), sessionActive: true, sessionWordIds: [999]
+        });
+        app.loadState();
+        assertEqual(app.sessionActive, false);
+        assertEqual(app.currentSession.length, 0);
+      });
+    });
+
     // --- report --------------------------------------------------------
     const list = document.getElementById('results');
     let passCount = 0;
