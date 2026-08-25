@@ -440,6 +440,12 @@
       // one test so the real cleanup path in js/app.js actually runs.
       const originalLogoutUser = window.logoutUser;
       window.logoutUser = () => Promise.resolve();
+      // This test's whole point is that logout() deletes STORAGE_KEY from
+      // real localStorage - back up whatever was actually there first and
+      // restore it in `finally`, or running this suite on a real device
+      // (this file is publicly deployed at tests/test.html) would silently
+      // and permanently wipe that device's real saved progress.
+      const backup = localStorage.getItem(STORAGE_KEY);
       try {
         app.words = [makeWord({ id: 'leaked-word', status: 'green' })];
         app.currentStreak = 5;
@@ -469,6 +475,78 @@
         assertEqual(loadFromLocalStorage(), null, 'this device\'s saved progress should be cleared, not left for the next guest/account to inherit');
       } finally {
         window.logoutUser = originalLogoutUser;
+        if (backup === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, backup);
+      }
+    });
+
+    // ==== importProgress: validation, confirmation, backwards-compat =========
+
+    function makeFakeFileEvent(jsonText) {
+      const file = new File([new Blob([jsonText], { type: 'application/json' })], 'backup.json', { type: 'application/json' });
+      return { target: { files: [file], value: '' } };
+    }
+    // FileReader.readAsText() is asynchronous even for small in-memory
+    // blobs (queued as a task, not a microtask) - give it a turn before
+    // asserting on whatever importProgress's reader.onload was supposed to do.
+    function waitForFileRead() {
+      return new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    test('importProgress: a malformed file shape is rejected without touching existing progress', async () => {
+      // Regression: the old check was `data.words && data.allTimeStats`
+      // (truthy, not shape-checked) and assigned this.words = data.words
+      // before any validation of its contents - a file with e.g.
+      // words:"oops" got applied, and only crashed later inside the
+      // backwards-compat loop / the next render(), by which point
+      // this.words was already corrupted with no way back.
+      const originalWords = [makeWord({ id: 'keep-me', status: 'orange' })];
+      app.words = originalWords;
+      app.importProgress(makeFakeFileEvent(JSON.stringify({ words: 'not-an-array', allTimeStats: {} })));
+      await waitForFileRead();
+      assertEqual(app.words, originalWords, 'a malformed import should never mutate this.words');
+    });
+
+    test('importProgress: cancelling the confirmation leaves current progress untouched', async () => {
+      // Regression: there used to be no confirmation at all - picking the
+      // wrong backup file in the OS file dialog silently and permanently
+      // replaced all current progress with no way to undo it.
+      const originalConfirm = window.confirm;
+      window.confirm = () => false;
+      try {
+        const originalWords = [makeWord({ id: 'keep-me-2', status: 'orange' })];
+        app.words = originalWords;
+        const validButDifferentImport = { words: [makeWord({ id: 'from-file' })], allTimeStats: { totalAttempts: 1, totalCorrect: 1 } };
+        app.importProgress(makeFakeFileEvent(JSON.stringify(validButDifferentImport)));
+        await waitForFileRead();
+        assertEqual(app.words, originalWords, 'declining the confirm dialog should not apply the import');
+      } finally {
+        window.confirm = originalConfirm;
+      }
+    });
+
+    test('importProgress: a valid, confirmed import replaces progress and backfills missing fields', async () => {
+      const originalConfirm = window.confirm;
+      window.confirm = () => true;
+      const backup = localStorage.getItem(STORAGE_KEY);
+      try {
+        app.words = [makeWord({ id: 'old-word' })];
+        // Deliberately missing association/failCount/leech, simulating a
+        // backup exported by an older version of the app.
+        const importedWord = { id: 'imported-1', english: 'x', hebrew: 'y', status: 'green', streak: 2, difficulty: 'easy', testProbability: 0.5 };
+        app.importProgress(makeFakeFileEvent(JSON.stringify({ words: [importedWord], allTimeStats: { totalAttempts: 3, totalCorrect: 2 } })));
+        await waitForFileRead();
+
+        assertEqual(app.words.length, 1);
+        assertEqual(app.words[0].id, 'imported-1');
+        assertEqual(app.words[0].association, '', 'a missing association field should backfill to an empty string');
+        assertEqual(app.words[0].failCount, 0, 'a missing failCount field should backfill to 0');
+        assertEqual(app.words[0].leech, false, 'a missing leech field should backfill to false');
+        assertEqual(app.allTimeStats.totalAttempts, 3);
+      } finally {
+        window.confirm = originalConfirm;
+        if (backup === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, backup);
       }
     });
 

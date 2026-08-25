@@ -473,7 +473,12 @@
         if (this.readingTimerPaused && this.readingTimeRemaining > 0) {
           this.readingTimerActive = true;
           this.readingTimerPaused = false;
-          
+
+          // Defensive, matching startReadingTimer: clear any interval still
+          // running before starting a new one, so two never end up ticking
+          // at once (which would double the countdown speed) if this is
+          // ever reachable while readingTimerInterval is still live.
+          clearInterval(this.readingTimerInterval);
           this.readingTimerInterval = setInterval(() => {
             this.readingTimeRemaining--;
             this.updateTimerDisplay();
@@ -1239,29 +1244,47 @@
         reader.onload = (e) => {
           try {
             const data = JSON.parse(e.target.result);
-            if (data.words && data.allTimeStats) {
-              this.words = data.words;
-              this.allTimeStats = data.allTimeStats;
-              
-              // Ensure all words have association/leech fields (for backwards compatibility)
-              this.words.forEach(word => {
-                if (!word.hasOwnProperty('association')) {
-                  word.association = '';
-                }
-                if (!word.hasOwnProperty('failCount')) {
-                  word.failCount = 0;
-                }
-                if (!word.hasOwnProperty('leech')) {
-                  word.leech = false;
-                }
-              });
-              
-              this.saveState();
-              this.render();
-              this.showModal('ייבוא הצליח! ✅ ✅', `<div class="success-message">ההתקדמות שלך נטענה בהצלחה!</div><p>מילים להשלמה: ${this.words.filter(w => w.status !== 'green').length}</p>`);
-            } else {
+            // Validate the shape before touching this.words/allTimeStats at
+            // all - a hand-edited or corrupted file that merely has "words"
+            // and "allTimeStats" keys (e.g. words as a string/object, or a
+            // word missing `id`) used to pass the old truthy-only check,
+            // get assigned into this.words, and only then blow up inside
+            // the backwards-compat forEach below or the next render() -
+            // by which point this.words was already overwritten with
+            // garbage and there's no way back short of reloading the page.
+            const isValid = Array.isArray(data.words)
+              && data.words.length > 0
+              && data.words.every(w => w && typeof w === 'object' && w.id !== undefined && typeof w.english === 'string')
+              && data.allTimeStats && typeof data.allTimeStats === 'object';
+
+            if (!isValid) {
               this.showModal('שגיאת ייבוא ❌', '<p>פורמט הקובץ אינו תקף. בחר קובץ שיוצא ממערכת שינון מילים באנגלית.</p>');
+              return;
             }
+
+            if (!confirm(`ייבוא הקובץ יחליף את כל ההתקדמות הנוכחית שלך (${this.words.filter(w => w.status !== 'red').length} מילים בתהליך) בזו שבקובץ. להמשיך?`)) {
+              return;
+            }
+
+            // Ensure all words have association/leech fields (for backwards compatibility)
+            data.words.forEach(word => {
+              if (!word.hasOwnProperty('association')) {
+                word.association = '';
+              }
+              if (!word.hasOwnProperty('failCount')) {
+                word.failCount = 0;
+              }
+              if (!word.hasOwnProperty('leech')) {
+                word.leech = false;
+              }
+            });
+
+            this.words = data.words;
+            this.allTimeStats = data.allTimeStats;
+
+            this.saveState();
+            this.render();
+            this.showModal('ייבוא הצליח! ✅ ✅', `<div class="success-message">ההתקדמות שלך נטענה בהצלחה!</div><p>מילים להשלמה: ${this.words.filter(w => w.status !== 'green').length}</p>`);
           } catch (err) {
             this.showModal('שגיאת ייבוא ❌', '<p>לא יכול לקרוא את הקובץ. וודא שהוא קובץ JSON חוקי שיוצא ממערכת שינון מילים באנגלית.</p>');
           }
