@@ -67,7 +67,49 @@
         this.setupKeyboardDetection();
         this.setupBackButtonHandling();
         this.setupAutoSave();
+        this.loadWordOverrides();
         this.render();
+      }
+
+      // Owner-authored corrections to a word's spelling/meaning/example,
+      // stored in a shared Firebase location (not per-user progress) so a
+      // fix made once applies to every device/account instead of just the
+      // owner's own copy. Readable by anyone (no login required) so guests
+      // browsing before signing in also see corrected text; write access is
+      // restricted to the owner account by the `wordOverrides` RTDB rule -
+      // see editWordGlobal/saveWordOverride below.
+      loadWordOverrides(isRetry) {
+        if (!firebaseReady) return;
+        db.ref('wordOverrides').once('value')
+          .then((snapshot) => {
+            if (!snapshot.exists()) return;
+            const overrides = snapshot.val();
+            let changed = false;
+            this.words.forEach(word => {
+              const o = overrides[word.id];
+              if (o) {
+                if (o.english) word.english = o.english;
+                if (o.hebrew) word.hebrew = o.hebrew;
+                if (o.example) word.example = o.example;
+                changed = true;
+              }
+            });
+            if (changed) this.render();
+          })
+          .catch((error) => {
+            // This is the very first Firebase read the app issues, fired
+            // synchronously from the constructor before the websocket
+            // connection has finished its initial handshake - that specific
+            // timing slot can get a spurious permission_denied even with a
+            // correct public-read rule, resolving itself a moment later. One
+            // retry papers over that startup race instead of leaving the
+            // rare affected user permanently missing out on word corrections.
+            if (!isRetry && error.code === 'PERMISSION_DENIED') {
+              setTimeout(() => this.loadWordOverrides(true), 2000);
+              return;
+            }
+            console.warn('Could not load word overrides:', error.message);
+          });
       }
       
       setupAutoSave() {
@@ -2402,7 +2444,10 @@
                 ${rows.map(r => `
                   <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light); gap: 0.75rem;">
                     <div><strong>${this.escapeHtml(r.english)}</strong> - ${this.escapeHtml(r.hebrew)}</div>
-                    <span style="color: var(--red); font-weight: 600; font-size: 0.85rem; flex-shrink: 0;">${r.reporterCount} דיווח${r.reporterCount > 1 ? 'ים' : ''}</span>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                      <span style="color: var(--red); font-weight: 600; font-size: 0.85rem;">${r.reporterCount} דיווח${r.reporterCount > 1 ? 'ים' : ''}</span>
+                      <button onclick="app.editWordGlobal(${r.wordId})" class="btn btn-sm btn-secondary">✏️ ערוך</button>
+                    </div>
                   </div>
                 `).join('')}
               </div>
@@ -2416,6 +2461,7 @@
 
       showFlaggedWordsModal() {
         const flagged = this.words.filter(w => w.flagged);
+        const isOwner = this.isOwner();
         let content;
         if (flagged.length === 0) {
           content = `
@@ -2434,13 +2480,79 @@
                   <div>
                     <strong>${w.english}</strong> - ${w.hebrew}
                   </div>
-                  <button onclick="app.toggleFlag(${w.id}); app.showFlaggedWordsModal();" class="btn btn-sm btn-secondary" style="flex-shrink: 0;">בטל סימון</button>
+                  <div style="display: flex; gap: 0.5rem; flex-shrink: 0;">
+                    ${isOwner ? `<button onclick="app.editWordGlobal(${w.id})" class="btn btn-sm btn-secondary">✏️ ערוך</button>` : ''}
+                    <button onclick="app.toggleFlag(${w.id}); app.showFlaggedWordsModal();" class="btn btn-sm btn-secondary">בטל סימון</button>
+                  </div>
                 </div>
               `).join('')}
             </div>
           `;
         }
         this.showModal('🚩 מילים שסומנו', content);
+      }
+
+      // True only for the app owner's own logged-in account - see
+      // loadWordOverrides for why edits are gated this way instead of
+      // being open to every user.
+      isOwner() {
+        return !!(currentUser && currentUser.email === 'eilaydror@gmail.com');
+      }
+
+      // Opens an editor for a word's English spelling / Hebrew meaning /
+      // example sentence. Owner-only: this writes to the shared
+      // `wordOverrides` node (see loadWordOverrides), which corrects the
+      // word for every user, not just the current device.
+      editWordGlobal(wordId) {
+        if (!this.isOwner()) return;
+        const word = this.words.find(w => w.id === wordId);
+        if (!word) return;
+        const content = `
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <label style="font-weight: 600; font-size: 0.9rem;">אנגלית
+              <input type="text" id="edit-english-${wordId}" value="${this.escapeHtml(word.english)}" style="width: 100%; margin-top: 0.3rem; padding: 0.6rem; font-size: 0.95rem; direction: ltr; border: 1px solid var(--border-light); border-radius: 10px;">
+            </label>
+            <label style="font-weight: 600; font-size: 0.9rem;">משמעות בעברית
+              <input type="text" id="edit-hebrew-${wordId}" value="${this.escapeHtml(word.hebrew)}" style="width: 100%; margin-top: 0.3rem; padding: 0.6rem; font-size: 0.95rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 10px;">
+            </label>
+            <label style="font-weight: 600; font-size: 0.9rem;">משפט לדוגמה
+              <input type="text" id="edit-example-${wordId}" value="${this.escapeHtml(word.example || '')}" style="width: 100%; margin-top: 0.3rem; padding: 0.6rem; font-size: 0.95rem; direction: ltr; border: 1px solid var(--border-light); border-radius: 10px;">
+            </label>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="app.saveWordOverride(${wordId})">שמור תיקון</button>
+          </div>
+        `;
+        this.showModal(`✏️ עריכת מילה`, content);
+      }
+
+      saveWordOverride(wordId) {
+        if (!this.isOwner()) return;
+        const word = this.words.find(w => w.id === wordId);
+        if (!word) return;
+
+        const englishInput = document.getElementById(`edit-english-${wordId}`);
+        const hebrewInput = document.getElementById(`edit-hebrew-${wordId}`);
+        const exampleInput = document.getElementById(`edit-example-${wordId}`);
+        const english = englishInput.value.trim();
+        const hebrew = hebrewInput.value.trim();
+        const example = exampleInput.value.trim();
+        if (!english || !hebrew) return;
+
+        word.english = english;
+        word.hebrew = hebrew;
+        word.example = example;
+
+        db.ref(`wordOverrides/${wordId}`).set({
+          english,
+          hebrew,
+          example,
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          updatedBy: currentUser.email
+        }).catch((error) => {
+          console.warn('Could not save word override:', error.message);
+        });
+
+        this.closeModal();
+        this.render();
       }
 
       // Lets someone undo a mastery they don't actually trust (e.g. they
