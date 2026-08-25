@@ -206,6 +206,12 @@
         this.sessionIndex = 0;
         this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
         this.sessionActive = true;
+        // A grade from a previous session shouldn't be undoable once a new
+        // one has started - undo() only checks `this.lastAction`, not
+        // whether that word is even still in currentSession, so leaving it
+        // set would let a stray Undo mutate a word from the session that
+        // just ended and decrement the just-reset session/all-time stats.
+        this.lastAction = null;
         this.startBreakTimer();
         this.render();
       }
@@ -790,6 +796,13 @@
           this.saveProgress(); // Auto-save before exiting
           this.sessionActive = false;
           this.sessionIndex = 0;
+          // Otherwise pressing undo after starting a brand-new session (or
+          // even just leaving without grading anything else) would still
+          // act on a word from the session that was just exited - it isn't
+          // part of currentSession any more, but undo() doesn't require
+          // that, so it would silently mutate a word's status/streak/dueAt
+          // from a past session and decrement the just-reset session stats.
+          this.lastAction = null;
           this.render();
         }
       }
@@ -798,20 +811,32 @@
         // Revert the last markWordKnown/markWordUnknown action
         if (!this.lastAction) return;
 
-        const { word, prevStatus, prevStreak, prevUpdatedAt, prevDueAt, wasCorrect, prevIndex } = this.lastAction;
+        const { word, prevStatus, prevStreak, prevUpdatedAt, prevDueAt, prevFailCount, prevLeech, wasCorrect, prevIndex } = this.lastAction;
         word.status = prevStatus;
         word.streak = prevStreak;
         word.updatedAt = prevUpdatedAt ?? null;
         word.dueAt = prevDueAt ?? null;
+        // markWordKnown/markWordUnknown both also touch failCount/leech
+        // (a miss increments failCount and can flip leech at the
+        // threshold; reaching green resets both) - restore them too, or
+        // repeatedly grading wrong then undoing would silently ratchet
+        // failCount up on every undo cycle until the word leeches anyway,
+        // with undo powerless to reverse a flag it never snapshotted.
+        word.failCount = prevFailCount ?? 0;
+        word.leech = prevLeech ?? false;
 
         // If the word had been requeued to the back of the session (a
-        // missed word), put it back where it was.
+        // missed word), put it back where it was - or, if it crossed the
+        // leech threshold and was pulled out of the session entirely (see
+        // markWordUnknown), it won't be in currentSession at all any more,
+        // so re-insert it rather than silently leaving it stuck out of
+        // rotation even after leech is restored to false above.
         if (typeof prevIndex === 'number' && prevIndex !== -1) {
           const idx = this.currentSession.indexOf(word);
           if (idx !== -1) {
             this.currentSession.splice(idx, 1);
-            this.currentSession.splice(prevIndex, 0, word);
           }
+          this.currentSession.splice(Math.min(prevIndex, this.currentSession.length), 0, word);
         }
 
         if (wasCorrect) {
@@ -2628,7 +2653,15 @@
           updatedAt: firebase.database.ServerValue.TIMESTAMP,
           updatedBy: currentUser.email
         }).catch((error) => {
+          // The word object above is already mutated locally and the
+          // modal below reports success, so a failed shared write needs
+          // its own visible warning - otherwise the owner believes the
+          // correction is live for every user, while it will actually
+          // silently revert on this device's next loadWordOverrides()
+          // (or never even reach other users at all) with no indication
+          // anything went wrong beyond a console warning nobody reads.
           console.warn('Could not save word override:', error.message);
+          this.showModal('⚠️ שגיאת שמירה', `<p>העריכה נשמרה במכשיר הזה בלבד - השמירה המשותפת (לכל המשתמשים) נכשלה: ${this.escapeHtml(error.message)}</p><p>נסה שוב מאוחר יותר.</p>`);
         });
 
         this.closeModal();
@@ -2954,6 +2987,18 @@
       }
 
       gradeCurrentCard(word, correct) {
+        // The actual grade doesn't apply until the setTimeout below fires,
+        // ~220ms later - until then word.status hasn't changed, so
+        // getCurrentSessionWord() keeps returning this same word. Without
+        // this lock, holding an arrow key (native keydown auto-repeat),
+        // or a swipe immediately followed by a keypress, queues a second
+        // grade against the same still-red/orange word; both timeouts
+        // then fire back-to-back and walk it red->orange->green from a
+        // single continuous input, skipping the "two correct answers a
+        // few hours apart" spaced-repetition rule entirely.
+        if (this._gradingInFlight) return;
+        this._gradingInFlight = true;
+
         // Animate the card off-screen, then apply the grade once the
         // animation has had time to play - makes swiping/keyboard grading
         // feel like a responsive deck of cards instead of an instant
@@ -2969,6 +3014,7 @@
         this._lastGradeDir = correct ? 1 : -1;
 
         setTimeout(() => {
+          this._gradingInFlight = false;
           if (correct) {
             this.markWordKnown(word);
           } else {
@@ -3013,7 +3059,7 @@
       // its second answer, instead of duplicating the stats/tier/undo
       // bookkeeping below in a second function.
       markWordKnown(word, forceMaster = false) {
-        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: true };
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, prevFailCount: word.failCount, prevLeech: word.leech, wasCorrect: true };
 
         // Snapshot the tier before grading - if mastering this word happens
         // to complete the whole current tier, this changes below and we
@@ -3067,7 +3113,7 @@
 
       markWordUnknown(word) {
         const prevIndex = this.currentSession.indexOf(word);
-        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, wasCorrect: false, prevIndex };
+        this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, prevFailCount: word.failCount, prevLeech: word.leech, wasCorrect: false, prevIndex };
 
         // User swiped LEFT (doesn't know)
         if (word.status === 'orange') {

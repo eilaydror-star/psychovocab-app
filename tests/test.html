@@ -550,6 +550,97 @@
       }
     });
 
+    // ==== undo: full state restoration ========================================
+
+    test('undo: restores failCount/leech, and re-inserts a word pulled out entirely at the leech threshold', () => {
+      // Regression: undo() used to only snapshot/restore
+      // status/streak/updatedAt/dueAt - failCount and leech were never
+      // captured, so undoing a miss silently left failCount incremented
+      // (and, at the threshold, left leech stuck true with the word
+      // missing from currentSession entirely) even though status/streak
+      // looked fully reverted.
+      const w = makeWord({ status: 'red', failCount: 3, leech: false });
+      const other = makeWord({ status: 'red' });
+      app.currentSession = [w, other];
+      app.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
+      app.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+
+      app.markWordUnknown(w); // 4th fail -> crosses LEECH_THRESHOLD, pulled out of the session
+      assertEqual(w.failCount, 4);
+      assertEqual(w.leech, true);
+      assert(!app.currentSession.includes(w), 'expected the word to have left the session on becoming a leech');
+
+      app.undo();
+      assertEqual(w.failCount, 3, 'failCount should revert to its pre-miss value');
+      assertEqual(w.leech, false, 'leech should be undone along with everything else the miss changed');
+      assert(app.currentSession.includes(w), 'expected undo to put the word back in the session, not leave it stranded out of rotation');
+    });
+
+    test('undo: restores the failCount/leech reset that happens on reaching green', () => {
+      const w = makeWord({ status: 'orange', streak: 1, failCount: 2, leech: false });
+      app.currentSession = [w];
+      app.markWordKnown(w); // reaches green -> failCount/leech both reset
+      assertEqual(w.failCount, 0);
+
+      app.undo();
+      assertEqual(w.status, 'orange');
+      assertEqual(w.failCount, 2, 'the failCount that green-mastery reset to 0 should come back on undo');
+    });
+
+    test('goBack: clears lastAction so a later Undo cannot act on a word from the exited session', () => {
+      // Regression: goBack() reset sessionActive/sessionStats but left
+      // this.lastAction pointing at whatever was last graded - pressing
+      // Undo after leaving (even into a totally different later session)
+      // would still silently mutate that old word.
+      const w = makeWord({ status: 'red' });
+      app.currentSession = [w];
+      app.markWordKnown(w); // sets lastAction
+      assert(app.lastAction !== null);
+
+      const originalConfirm = window.confirm;
+      window.confirm = () => true;
+      try {
+        app.goBack();
+      } finally {
+        window.confirm = originalConfirm;
+      }
+      assertEqual(app.lastAction, null, 'goBack should clear lastAction, not just sessionActive');
+    });
+
+    test('startNewSession: clears lastAction from the previous session', () => {
+      const w = makeWord({ status: 'red', difficulty: 'easy' });
+      app.currentSession = [w];
+      app.markWordKnown(w); // sets lastAction
+      assert(app.lastAction !== null);
+
+      app.words = [makeWord({ difficulty: 'easy', status: 'red' })];
+      app.sessionActive = false;
+      app.currentSession = [];
+      app.startNewSession();
+      assertEqual(app.lastAction, null, 'a fresh session should not leave the previous session\'s grade undoable');
+    });
+
+    // ==== gradeCurrentCard: no double-grading from a held key/rapid input ====
+
+    test('gradeCurrentCard: a second call while a grade is still in-flight is ignored', async () => {
+      // Regression: the actual grade only applies ~220ms later (inside a
+      // setTimeout, for the flip animation), so word.status hadn't changed
+      // yet if a second keydown (native auto-repeat from holding the key)
+      // or a swipe-then-keypress fired in that window - both calls would
+      // schedule their own markWordKnown, and since neither knew about the
+      // other, they'd land back-to-back and walk the word red -> orange ->
+      // green from a single continuous input instead of two separate
+      // correct answers "a few hours apart".
+      const w = makeWord({ status: 'red' });
+      app.currentSession = [w];
+      app._gradingInFlight = false;
+      app.gradeCurrentCard(w, true);
+      app.gradeCurrentCard(w, true); // simulates a second grade firing before the first has landed
+      await new Promise(resolve => setTimeout(resolve, 300));
+      assertEqual(w.status, 'orange', 'only the first grade should have applied');
+      assertEqual(w.streak, 1);
+    });
+
     // --- run everything, then report ------------------------------------
     (async () => {
       for (const { name, fn } of testCases) {
