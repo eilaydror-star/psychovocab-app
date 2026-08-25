@@ -28,7 +28,7 @@
   </div>
   <div id="app-content"></div>
   <div id="modal-overlay" style="display:none;">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
       <div class="modal-header" id="modal-title"></div>
       <div class="modal-content" id="modal-body"></div>
     </div>
@@ -72,7 +72,7 @@
     function makeWord(overrides) {
       return Object.assign({
         id: Math.random(),
-        english: 'test', hebrew: 'בדיקה', example: 'A test sentence.', emoji: '📚',
+        english: 'test', hebrew: 'בדיקה', example: 'A test sentence.',
         status: 'red', streak: 0, association: '', difficulty: 'easy', testProbability: 0.5,
         dueAt: null, flagged: false, updatedAt: null, failCount: 0, leech: false
       }, overrides);
@@ -639,6 +639,313 @@
       await new Promise(resolve => setTimeout(resolve, 300));
       assertEqual(w.status, 'orange', 'only the first grade should have applied');
       assertEqual(w.streak, 1);
+    });
+
+    // ==== XSS: word data must be escaped before hitting innerHTML ===========
+
+    test('renderSession: word text is HTML-escaped, not injected raw (XSS regression)', () => {
+      const malicious = makeWord({
+        id: 'xss-word',
+        english: '<img src=x onerror=alert(1)>',
+        hebrew: '<scr' + 'ipt>alert(2)</scr' + 'ipt>',
+        example: '</div><b>injected</b>',
+        association: '</textarea><scr' + 'ipt>alert(3)</scr' + 'ipt>'
+      });
+      app.currentSession = [malicious];
+      const container = document.createElement('div');
+      app.renderSession(container);
+      assert(!container.innerHTML.includes('<img src=x'), 'word.english should be escaped, not rendered as a live element');
+      assert(!container.innerHTML.includes('<scr' + 'ipt>alert(2)'), 'word.hebrew should be escaped');
+      assertEqual(container.querySelectorAll('img').length, 0, 'no live <img> should exist from word.english');
+      assertEqual(container.querySelectorAll('script').length, 0, 'no live <script> should exist from word data');
+      const textarea = container.querySelector('textarea[id^="assoc-"]');
+      assert(textarea !== null, 'expected the association textarea to render');
+      assertEqual(textarea.value, '</textarea><scr' + 'ipt>alert(3)</scr' + 'ipt>', 'association should still read back as plain text, not break out of the textarea');
+    });
+
+    test('showFlaggedWordsModal: word text is HTML-escaped in the modal body', () => {
+      const malicious = makeWord({ id: 'xss-flag', english: '<img src=x onerror=alert(1)>', hebrew: '<b>bold</b>', flagged: true });
+      app.words = [malicious];
+      app.showFlaggedWordsModal();
+      const body = document.getElementById('modal-body');
+      assertEqual(body.querySelectorAll('img').length, 0, 'flagged word list must escape word.english');
+      assert(!body.innerHTML.includes('<b>bold</b>'), 'flagged word list must escape word.hebrew');
+    });
+
+    test('showMasteredWordsModal: word text is HTML-escaped in the modal body', () => {
+      const malicious = makeWord({ id: 'xss-mastered', english: '<img src=x onerror=alert(1)>', hebrew: '<b>bold</b>', status: 'green' });
+      app.words = [malicious];
+      app.showMasteredWordsModal();
+      const body = document.getElementById('modal-body');
+      assertEqual(body.querySelectorAll('img').length, 0, 'mastered word list must escape word.english');
+      assert(!body.innerHTML.includes('<b>bold</b>'), 'mastered word list must escape word.hebrew');
+    });
+
+    test('showLeechWordsModal: word text and association are HTML-escaped in the modal body', () => {
+      const malicious = makeWord({ id: 'xss-leech', english: '<img src=x onerror=alert(1)>', hebrew: '<b>bold</b>', leech: true, failCount: 4, association: '</textarea><scr' + 'ipt>alert(1)</scr' + 'ipt>' });
+      app.words = [malicious];
+      app.showLeechWordsModal();
+      const body = document.getElementById('modal-body');
+      assertEqual(body.querySelectorAll('img').length, 0, 'leech word list must escape word.english');
+      assertEqual(body.querySelectorAll('script').length, 0, 'leech word list must escape word.association inside the textarea');
+      const textarea = body.querySelector('textarea[id^="leech-assoc-"]');
+      assertEqual(textarea.value, '</textarea><scr' + 'ipt>alert(1)</scr' + 'ipt>');
+    });
+
+    // ==== showModal / closeModal: dialog focus management ====================
+
+    test('showModal/closeModal: moves focus into the dialog and restores it on close', () => {
+      const btn = document.createElement('button');
+      document.body.appendChild(btn);
+      btn.focus();
+      try {
+        app.showModal('כותרת', '<p>שלום</p>');
+        const modalEl = document.querySelector('#modal-overlay .modal');
+        assertEqual(document.activeElement, modalEl, 'focus should move into the dialog on open');
+        app.closeModal();
+        assertEqual(document.activeElement, btn, 'focus should return to whatever was focused before the modal opened');
+      } finally {
+        btn.remove();
+      }
+    });
+
+    // ==== hasGuestProgress / handleGuestToAccountTransition ==================
+
+    test('hasGuestProgress: false when the user never studied without logging in', () => {
+      app.userSkippedLogin = false;
+      app.words = [makeWord({ updatedAt: Date.now() })];
+      app.allTimeStats = { totalAttempts: 5, totalCorrect: 5 };
+      assertEqual(app.hasGuestProgress(), false);
+    });
+
+    test('hasGuestProgress: false for a guest who has not graded anything yet', () => {
+      app.userSkippedLogin = true;
+      app.words = [makeWord({ updatedAt: null })];
+      app.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+      assertEqual(app.hasGuestProgress(), false);
+    });
+
+    test('hasGuestProgress: true once a guest has graded at least one word', () => {
+      app.userSkippedLogin = true;
+      app.words = [makeWord({ updatedAt: Date.now() })];
+      app.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+      assertEqual(app.hasGuestProgress(), true);
+    });
+
+    test('handleGuestToAccountTransition: declining the merge wipes local guest state before loading the account', () => {
+      // Regression: guest -> login used to always call loadProgressFromFirebase()
+      // directly, whose per-word merge keeps whichever side has the newer
+      // updatedAt - so a guest's just-graded words (always "newest") would
+      // silently overwrite the real, older cloud progress on the very next sync.
+      const originalConfirm = window.confirm;
+      const originalFirebaseReady = firebaseReady;
+      const originalCurrentUser = currentUser;
+      window.confirm = () => false; // decline the merge
+      firebaseReady = true;
+      currentUser = { uid: 'test-uid' };
+      let loadCalled = false;
+      app.loadProgressFromFirebase = () => { loadCalled = true; };
+      try {
+        app.words = [makeWord({ id: 'guest-word', status: 'green', updatedAt: Date.now() })];
+        app.currentStreak = 5;
+        app.studyHistory = { '2026-08-24': 1 };
+        app.userSkippedLogin = true;
+        app.handleGuestToAccountTransition();
+        assert(!app.words.some(w => w.id === 'guest-word'), 'declining the merge should discard the guest\'s words entirely');
+        assertEqual(app.currentStreak, 0, 'declining the merge should reset the guest\'s streak too');
+        assertEqual(Object.keys(app.studyHistory).length, 0);
+        assert(loadCalled, 'should still load the account\'s real cloud progress after wiping local guest state');
+      } finally {
+        window.confirm = originalConfirm;
+        firebaseReady = originalFirebaseReady;
+        currentUser = originalCurrentUser;
+        delete app.loadProgressFromFirebase;
+      }
+    });
+
+    test('handleGuestToAccountTransition: confirming the merge keeps local guest progress and still loads', () => {
+      const originalConfirm = window.confirm;
+      const originalFirebaseReady = firebaseReady;
+      const originalCurrentUser = currentUser;
+      window.confirm = () => true; // confirm the merge
+      firebaseReady = true;
+      currentUser = { uid: 'test-uid' };
+      let loadCalled = false;
+      app.loadProgressFromFirebase = () => { loadCalled = true; };
+      try {
+        app.words = [makeWord({ id: 'guest-word-2', status: 'green', updatedAt: Date.now() })];
+        app.userSkippedLogin = true;
+        app.handleGuestToAccountTransition();
+        assert(app.words.some(w => w.id === 'guest-word-2'), 'confirming the merge should keep the guest\'s local words for loadProgressFromFirebase to merge');
+        assert(loadCalled, 'should proceed to load/merge the account\'s cloud progress');
+      } finally {
+        window.confirm = originalConfirm;
+        firebaseReady = originalFirebaseReady;
+        currentUser = originalCurrentUser;
+        delete app.loadProgressFromFirebase;
+      }
+    });
+
+    // ==== mergeAccumulatedFields: Firebase sync of streak/history/stats ======
+
+    function freshAccumulatorState() {
+      app.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+      app.currentStreak = 0;
+      app.sessionsToday = 0;
+      app.lastStudyDate = null;
+      app.studyHistory = {};
+      app.sessionActive = false;
+      app.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
+    }
+
+    test('mergeAccumulatedFields: allTimeStats takes the max of local and remote counters', () => {
+      freshAccumulatorState();
+      app.allTimeStats = { totalAttempts: 10, totalCorrect: 8 };
+      const merged = app.mergeAccumulatedFields({ allTimeStats: { totalAttempts: 15, totalCorrect: 5 } });
+      assertEqual(merged.allTimeStats.totalAttempts, 15, 'higher remote totalAttempts should win');
+      assertEqual(merged.allTimeStats.totalCorrect, 8, 'higher local totalCorrect should win');
+    });
+
+    test('mergeAccumulatedFields: same lastStudyDate merges sessionsToday/currentStreak by max', () => {
+      freshAccumulatorState();
+      app.currentStreak = 3;
+      app.sessionsToday = 1;
+      app.lastStudyDate = '2026-08-20';
+      const merged = app.mergeAccumulatedFields({ lastStudyDate: '2026-08-20', sessionsToday: 4, currentStreak: 3 });
+      assertEqual(merged.sessionsToday, 4, 'expected the higher sessionsToday - another device studied more today');
+      assertEqual(merged.currentStreak, 3);
+    });
+
+    test('mergeAccumulatedFields: a more recent remote lastStudyDate replaces a stale local one entirely', () => {
+      freshAccumulatorState();
+      app.currentStreak = 1;
+      app.sessionsToday = 1;
+      app.lastStudyDate = '2026-08-01';
+      const merged = app.mergeAccumulatedFields({ lastStudyDate: '2026-08-20', sessionsToday: 2, currentStreak: 9 });
+      assertEqual(merged.lastStudyDate, '2026-08-20');
+      assertEqual(merged.sessionsToday, 2);
+      assertEqual(merged.currentStreak, 9);
+    });
+
+    test('mergeAccumulatedFields: studyHistory merges by date key, taking the higher count per date', () => {
+      freshAccumulatorState();
+      app.studyHistory = { '2026-08-20': 2, '2026-08-21': 1 };
+      const merged = app.mergeAccumulatedFields({ studyHistory: { '2026-08-20': 5, '2026-08-22': 3 } });
+      assertEqual(merged.studyHistory['2026-08-20'], 5, 'remote had more sessions that day');
+      assertEqual(merged.studyHistory['2026-08-21'], 1, 'local-only date should survive the merge');
+      assertEqual(merged.studyHistory['2026-08-22'], 3, 'remote-only date should survive the merge');
+    });
+
+    test('mergeAccumulatedFields: a device with no active session does not clobber another device\'s resumable one', () => {
+      freshAccumulatorState();
+      const remoteSessionStats = { correct: 3, incorrect: 1, streak: 2 };
+      const merged = app.mergeAccumulatedFields({ sessionActive: true, sessionStats: remoteSessionStats, sessionWordIds: [1, 2, 3] });
+      assertEqual(merged.sessionActive, true, 'the other device\'s active session should be preserved, not overwritten with "no session"');
+      assertEqual(merged.sessionStats, remoteSessionStats);
+    });
+
+    test('mergeAccumulatedFields: this device\'s own active session takes precedence over a remote one', () => {
+      freshAccumulatorState();
+      app.sessionActive = true;
+      app.sessionStats = { correct: 5, incorrect: 0, streak: 5 };
+      const merged = app.mergeAccumulatedFields({ sessionActive: true, sessionStats: { correct: 1, incorrect: 1, streak: 0 } });
+      assertEqual(merged.sessionActive, true);
+      assertEqual(merged.sessionStats.correct, 5, 'this device is mid-session right now - its own state should win');
+    });
+
+    // ==== exportProgress / importProgress: streak & history round-trip =======
+
+    test('exportProgress: includes currentStreak/sessionsToday/lastStudyDate/studyHistory', async () => {
+      app.words = [makeWord({ id: 'w1' })];
+      app.allTimeStats = { totalAttempts: 1, totalCorrect: 1 };
+      app.currentStreak = 7;
+      app.sessionsToday = 2;
+      app.lastStudyDate = '2026-08-24';
+      app.studyHistory = { '2026-08-24': 2 };
+
+      const originalClick = HTMLAnchorElement.prototype.click;
+      const originalRevoke = URL.revokeObjectURL;
+      let capturedHref = null;
+      HTMLAnchorElement.prototype.click = function () { capturedHref = this.href; };
+      // exportProgress() revokes the blob URL right after "clicking" the
+      // link - hold that off until this test has actually fetched it back.
+      URL.revokeObjectURL = () => {};
+      try {
+        app.exportProgress();
+        assert(capturedHref !== null, 'expected a download link to be created');
+        const parsed = await (await fetch(capturedHref)).json();
+        assertEqual(parsed.currentStreak, 7, 'exported backup should include the current streak');
+        assertEqual(parsed.sessionsToday, 2, 'exported backup should include sessions-today');
+        assertEqual(parsed.lastStudyDate, '2026-08-24', 'exported backup should include lastStudyDate');
+        assertEqual(parsed.studyHistory['2026-08-24'], 2, 'exported backup should include studyHistory');
+      } finally {
+        HTMLAnchorElement.prototype.click = originalClick;
+        URL.revokeObjectURL = originalRevoke;
+        URL.revokeObjectURL(capturedHref);
+      }
+    });
+
+    test('importProgress: backfills dueAt/updatedAt/flagged, and restores streak/session history from the backup', async () => {
+      // Regression: only association/failCount/leech were ever backfilled -
+      // a backup missing dueAt/updatedAt/flagged (older export format) left
+      // those undefined, which the next Firebase sync's transaction() would
+      // silently drop, and a missing dueAt/updatedAt would make
+      // startNewSession() treat the word as permanently due. Separately,
+      // streak/sessionsToday/studyHistory were dropped by import entirely.
+      const originalConfirm = window.confirm;
+      window.confirm = () => true;
+      const backup = localStorage.getItem(STORAGE_KEY);
+      try {
+        app.words = [makeWord({ id: 'old-word' })];
+        app.currentStreak = 0;
+        app.sessionsToday = 0;
+        app.lastStudyDate = null;
+        app.studyHistory = {};
+        const importedWord = { id: 'imported-2', english: 'x', hebrew: 'y', status: 'red', streak: 0, difficulty: 'easy', testProbability: 0.5 };
+        app.importProgress(makeFakeFileEvent(JSON.stringify({
+          words: [importedWord],
+          allTimeStats: { totalAttempts: 1, totalCorrect: 1 },
+          currentStreak: 12, sessionsToday: 3, lastStudyDate: '2026-08-24', studyHistory: { '2026-08-24': 3 }
+        })));
+        await waitForFileRead();
+
+        assertEqual(app.words[0].dueAt, null, 'missing dueAt should backfill to null, not stay undefined');
+        assertEqual(app.words[0].updatedAt, null, 'missing updatedAt should backfill to null');
+        assertEqual(app.words[0].flagged, false, 'missing flagged should backfill to false');
+        assertEqual(app.currentStreak, 12, 'import should restore the streak from the backup');
+        assertEqual(app.sessionsToday, 3);
+        assertEqual(app.lastStudyDate, '2026-08-24');
+        assertEqual(app.studyHistory['2026-08-24'], 3);
+      } finally {
+        window.confirm = originalConfirm;
+        if (backup === null) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, backup);
+      }
+    });
+
+    // ==== saveProgress: debounced persistence ================================
+
+    test('saveProgress: rapid successive calls collapse into a single save', async () => {
+      // Regression: every markWordKnown/markWordUnknown/updateAssociation
+      // call used to invoke saveState() synchronously and immediately - a
+      // fast run of grades wrote the full word array to localStorage AND
+      // opened a Firebase transaction once per grade.
+      const original = app.saveProgress; // currently the no-op override from setup
+      delete app.saveProgress; // fall back to the real prototype method
+      const originalSaveState = app.saveState;
+      let saveCount = 0;
+      app.saveState = () => { saveCount++; };
+      try {
+        app.saveProgress();
+        app.saveProgress();
+        app.saveProgress();
+        assertEqual(saveCount, 0, 'a save should not happen synchronously - it should be scheduled');
+        await new Promise(resolve => setTimeout(resolve, 700));
+        assertEqual(saveCount, 1, 'three rapid calls should collapse into exactly one actual save');
+      } finally {
+        app.saveState = originalSaveState;
+        app.saveProgress = original;
+      }
     });
 
     // --- run everything, then report ------------------------------------

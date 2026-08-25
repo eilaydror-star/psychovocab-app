@@ -57,7 +57,20 @@ function initializeFirebase() {
           // sessions, so it must be the "load" direction or a fresh/empty
           // device would silently overwrite real cloud progress with a
           // blank slate.
-          window.app.loadProgressFromFirebase();
+          //
+          // `wasChecked` distinguishes the very first callback (page
+          // boot - either restoring a persisted session, or confirming
+          // there's none) from a later one firing because the user just
+          // signed in during this same page visit. Only in that second
+          // case can there be real, unsynced guest progress sitting in
+          // memory that a blind merge would silently let clobber the
+          // account's actual cloud data - see hasGuestProgress()/
+          // handleGuestToAccountTransition() in js/app.js.
+          if (wasChecked && window.app.hasGuestProgress()) {
+            window.app.handleGuestToAccountTransition();
+          } else {
+            window.app.loadProgressFromFirebase();
+          }
         } else {
           console.log('No user logged in');
           if (!wasChecked) window.app.render();

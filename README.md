@@ -13,8 +13,11 @@ Live site: https://eilaydror-star.github.io/psychovocab-app/
 - If you exit mid-set, the exact words, their order, and your progress within that set are saved (to `localStorage` and synced to Firebase) and automatically resumed the next time the app opens, instead of starting a new random session
 - During a session, a side list shows every word in the current set, color-coded red/orange/green as you go - a sidebar next to the word card on wide screens, collapsing to a drawer below it on narrow/mobile screens
 - A "שינון עד תום" button lets you mark a word you already know well as mastered (green) immediately, instead of waiting to answer it correctly twice across a rest period
-- Progress is saved to `localStorage` automatically, and also synced to Firebase Realtime Database when logged in - so progress follows you across devices
+- Progress is saved to `localStorage` automatically (debounced - rapid grading/note edits collapse into one write shortly after, flushed immediately if the tab is closed/hidden first), and also synced to Firebase Realtime Database when logged in - so progress follows you across devices
 - Firebase Authentication (email/password) handles login; each user's data is isolated by Firebase Realtime Database security rules
+- Firebase sync merges per-word progress by `updatedAt`, and merges the aggregate fields (streak, sessions-today, study history, all-time stats) too, so two tabs/devices studying around the same time don't clobber each other's counters
+- Studying as a guest and then logging into (or registering) an existing account asks whether to merge the guest device's local progress into the account or discard it - it's never merged silently, since a guest's just-touched words would otherwise look "newer" than real, older cloud progress and overwrite it
+- Export/import (in the save/progress modal) includes streak, sessions-today, and study history alongside word progress and all-time stats, so restoring a backup doesn't reset your streak
 
 ## Project structure
 

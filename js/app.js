@@ -67,6 +67,7 @@
         this.setupKeyboardDetection();
         this.setupBackButtonHandling();
         this.setupAutoSave();
+        this.setupSaveFlush();
         this.loadWordOverrides();
         this.render();
       }
@@ -971,8 +972,39 @@
       }
       
       saveProgress() {
-        // Automatically save word progress to localStorage AND Firebase
-        this.saveState();
+        // Automatically save word progress to localStorage AND Firebase.
+        // Debounced: markWordKnown/markWordUnknown/updateAssociation (and
+        // a few others) each call this on their own, so grading a quick
+        // streak of cards - or typing into the association textarea -
+        // used to rewrite the entire ~4000-word array to localStorage AND
+        // open a brand-new Firebase transaction on every single keystroke/
+        // grade, on top of the existing 30s autosave. Collapsing calls that
+        // land within a short window into one real save cuts that down
+        // without changing when data is guaranteed to be persisted -
+        // still far under the 30s autosave interval, and flushed
+        // immediately if the tab is closed/hidden before the timer fires
+        // (see setupSaveFlush()).
+        clearTimeout(this._saveProgressTimer);
+        this._saveProgressTimer = setTimeout(() => {
+          this._saveProgressTimer = null;
+          this.saveState();
+        }, 500);
+      }
+
+      // Safety net for the debounce above: a save still pending when the
+      // tab is closed/backgrounded must not simply be lost.
+      setupSaveFlush() {
+        const flush = () => {
+          if (this._saveProgressTimer) {
+            clearTimeout(this._saveProgressTimer);
+            this._saveProgressTimer = null;
+            this.saveState();
+          }
+        };
+        window.addEventListener('beforeunload', flush);
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') flush();
+        });
       }
       
       syncProgressWithFirebase() {
@@ -1018,33 +1050,43 @@
             return localWord;
           });
 
+          const merged = this.mergeAccumulatedFields(remoteData);
+          const { _keepRemoteSession, ...accumulatedFields } = merged;
+
           return {
             words: mergedWords,
-            allTimeStats: this.allTimeStats,
-            currentStreak: this.currentStreak,
-            sessionsToday: this.sessionsToday,
-            lastStudyDate: this.lastStudyDate,
-            studyHistory: this.studyHistory,
-            sessionActive: this.sessionActive,
-            sessionWordIds: this.currentSession.map(w => w.id),
-            sessionStats: this.sessionStats,
+            ...accumulatedFields,
+            sessionWordIds: _keepRemoteSession ? ((remoteData && remoteData.sessionWordIds) || []) : this.currentSession.map(w => w.id),
             lastSaved: new Date().toISOString(),
             lastSyncedAt: firebase.database.ServerValue.TIMESTAMP
           };
         })
           .then((result) => {
             // Reflect whatever the transaction actually committed (it may
-            // have merged in another device's newer per-word changes) back
-            // into the in-memory word list, so this tab's UI/local state
-            // stays consistent with what's now on the server.
+            // have merged in another device's newer per-word AND
+            // accumulated-field changes) back into in-memory state, so this
+            // tab's UI stays consistent with what's now on the server
+            // instead of silently drifting from it until the next reload.
             if (result.committed && result.snapshot.exists()) {
-              const committedWords = result.snapshot.val().words || [];
+              const committed = result.snapshot.val();
+              const committedWords = committed.words || [];
               const committedMap = {};
               committedWords.forEach(w => { committedMap[w.id] = w; });
               this.words.forEach(localWord => {
                 const committedWord = committedMap[localWord.id];
                 if (committedWord) Object.assign(localWord, committedWord);
               });
+              this.allTimeStats = committed.allTimeStats || this.allTimeStats;
+              this.currentStreak = committed.currentStreak ?? this.currentStreak;
+              this.sessionsToday = committed.sessionsToday ?? this.sessionsToday;
+              this.lastStudyDate = committed.lastStudyDate ?? this.lastStudyDate;
+              this.studyHistory = committed.studyHistory ?? this.studyHistory;
+              // currentSession itself (the actual word objects, in order)
+              // is intentionally left alone here even when the committed
+              // sessionActive/sessionWordIds came from another device's
+              // in-progress set (see mergeAccumulatedFields) - reconstructing
+              // it belongs to restoreSession(), which runs on the next full
+              // load, not mid-sync.
             }
             console.log('Progress synced to Firebase');
             this.updatePublicProfile();
@@ -1053,6 +1095,63 @@
             console.warn('Firebase sync failed, using localStorage:', error.message);
             this.saveState(); // Fallback to localStorage
           });
+      }
+
+      // Merges the cumulative/aggregate progress fields (as opposed to
+      // per-word data, already merged above) against whatever is currently
+      // on the server, instead of blindly overwriting them with this
+      // device's own values. Without this, two devices/tabs studying around
+      // the same time - each auto-saving on its own 30s timer - take turns
+      // clobbering each other's streak/session-count/history with whichever
+      // one happened to sync last, even though neither write was wrong on
+      // its own.
+      mergeAccumulatedFields(remoteData) {
+        const remoteStats = (remoteData && remoteData.allTimeStats) || {};
+        const allTimeStats = {
+          totalAttempts: Math.max(this.allTimeStats.totalAttempts || 0, remoteStats.totalAttempts || 0),
+          totalCorrect: Math.max(this.allTimeStats.totalCorrect || 0, remoteStats.totalCorrect || 0)
+        };
+
+        // currentStreak/sessionsToday are only meaningful together with the
+        // calendar date they belong to - merge them as one unit: same date
+        // on both sides takes the higher counters (an in-place merge),
+        // different dates take whichever side's date is more recent (the
+        // other side is simply stale), never a naive max of unrelated days.
+        const remoteLastStudyDate = remoteData && remoteData.lastStudyDate;
+        const remoteSessionsToday = (remoteData && remoteData.sessionsToday) || 0;
+        const remoteCurrentStreak = (remoteData && remoteData.currentStreak) || 0;
+        let lastStudyDate = this.lastStudyDate;
+        let sessionsToday = this.sessionsToday;
+        let currentStreak = this.currentStreak;
+        if (remoteLastStudyDate && remoteLastStudyDate === this.lastStudyDate) {
+          sessionsToday = Math.max(this.sessionsToday, remoteSessionsToday);
+          currentStreak = Math.max(this.currentStreak, remoteCurrentStreak);
+        } else if (remoteLastStudyDate && (!this.lastStudyDate || remoteLastStudyDate > this.lastStudyDate)) {
+          lastStudyDate = remoteLastStudyDate;
+          sessionsToday = remoteSessionsToday;
+          currentStreak = remoteCurrentStreak;
+        }
+
+        // studyHistory: union of both sides' date keys, taking the higher
+        // session count for any date both sides recorded.
+        const studyHistory = { ...((remoteData && remoteData.studyHistory) || {}) };
+        Object.keys(this.studyHistory).forEach(date => {
+          studyHistory[date] = Math.max(studyHistory[date] || 0, this.studyHistory[date]);
+        });
+
+        // sessionActive/sessionStats describe *this device's* in-progress
+        // set, not a shared counter - there's nothing meaningful to
+        // numerically merge. The only real risk is a device with no active
+        // session (e.g. one that just opened the app) overwriting another
+        // device's genuinely resumable in-progress session in the cloud -
+        // so only let a "no session" write through when the cloud doesn't
+        // already have one running.
+        const remoteSessionActive = !!(remoteData && remoteData.sessionActive);
+        const keepRemoteSession = remoteSessionActive && !this.sessionActive;
+        const sessionActive = keepRemoteSession ? true : this.sessionActive;
+        const sessionStats = keepRemoteSession ? (remoteData.sessionStats || this.sessionStats) : this.sessionStats;
+
+        return { allTimeStats, currentStreak, sessionsToday, lastStudyDate, studyHistory, sessionActive, sessionStats, _keepRemoteSession: keepRemoteSession };
       }
 
       // Publishes just the stats needed for the friends feature (never
@@ -1135,6 +1234,53 @@
             this.loadProgressFromLocalStorage();
             this.render();
           });
+      }
+
+      // True when this device has actual guest (not-yet-logged-in) study
+      // progress sitting in memory - i.e. this is a device where someone
+      // clicked "המשך ללא כניסה" and then graded at least one word, rather
+      // than e.g. a fresh page load or a device that only ever used a real
+      // account. See handleGuestToAccountTransition() for why this matters.
+      hasGuestProgress() {
+        if (!this.userSkippedLogin) return false;
+        return this.words.some(w => w.updatedAt !== null) || (this.allTimeStats.totalAttempts || 0) > 0;
+      }
+
+      // Called instead of loadProgressFromFirebase() when a user who was
+      // just studying as a guest on this device signs into (or registers)
+      // an account mid-session. loadProgressFromFirebase()'s per-word merge
+      // keeps whichever side has the newer `updatedAt` - which sounds right
+      // for two devices on the *same* account, but is wrong here: the guest
+      // just touched a bunch of words seconds ago, so their fresh (but
+      // possibly brand-new/never-really-learned) guest status would always
+      // beat the account's real, possibly much more advanced, cloud
+      // progress - and the very next auto-save would write that guest data
+      // back to the cloud, permanently clobbering it. Instead of merging
+      // blindly, ask first.
+      handleGuestToAccountTransition() {
+        if (!firebaseReady || !currentUser) {
+          this.loadProgressFromFirebase();
+          return;
+        }
+        const shouldMerge = confirm(
+          'נמצאה התקדמות שנלמדה כאורח במכשיר הזה. האם למזג אותה לתוך ההתקדמות השמורה בחשבון שלך?\n\n' +
+          '"אישור" ימזג את שתי ההתקדמויות (מילים שנלמדו לאחרונה כאורח עשויות לדרוס מילים מקבילות מהחשבון).\n' +
+          '"ביטול" יתעלם מההתקדמות של האורח ויטען רק את מה ששמור בחשבון שלך.'
+        );
+        if (!shouldMerge) {
+          // Wipe this device's guest state before loading - so the cloud's
+          // real progress loads clean, with nothing local left to contest
+          // it word-by-word.
+          this.words = this.initializeWords();
+          this.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+          this.currentStreak = 0;
+          this.sessionsToday = 0;
+          this.lastStudyDate = null;
+          this.studyHistory = {};
+          this.sessionActive = false;
+          this.currentSession = [];
+        }
+        this.loadProgressFromFirebase();
       }
 
       loadFriends() {
@@ -1245,6 +1391,10 @@
         const state = {
           words: this.words,
           allTimeStats: this.allTimeStats,
+          currentStreak: this.currentStreak,
+          sessionsToday: this.sessionsToday,
+          lastStudyDate: this.lastStudyDate,
+          studyHistory: this.studyHistory,
           exportDate: new Date().toISOString(),
           version: '1.0'
         };
@@ -1291,21 +1441,30 @@
               return;
             }
 
-            // Ensure all words have association/leech fields (for backwards compatibility)
+            // Backfill every field initializeWords() guarantees on a fresh
+            // word, not just association/failCount/leech - a backup
+            // exported by an older app version (before dueAt/updatedAt/
+            // flagged existed, or before this export itself included
+            // streak/history) is otherwise missing keys that the next
+            // Firebase sync's transaction() silently drops (undefined
+            // fields), and dueAt/updatedAt missing entirely would make
+            // startNewSession() treat every imported word as permanently
+            // "due", ignoring whatever rest period it should still be in.
             data.words.forEach(word => {
-              if (!word.hasOwnProperty('association')) {
-                word.association = '';
-              }
-              if (!word.hasOwnProperty('failCount')) {
-                word.failCount = 0;
-              }
-              if (!word.hasOwnProperty('leech')) {
-                word.leech = false;
-              }
+              if (!word.hasOwnProperty('association')) word.association = '';
+              if (!word.hasOwnProperty('failCount')) word.failCount = 0;
+              if (!word.hasOwnProperty('leech')) word.leech = false;
+              if (!word.hasOwnProperty('dueAt')) word.dueAt = null;
+              if (!word.hasOwnProperty('updatedAt')) word.updatedAt = null;
+              if (!word.hasOwnProperty('flagged')) word.flagged = false;
             });
 
             this.words = data.words;
             this.allTimeStats = data.allTimeStats;
+            this.currentStreak = data.currentStreak || 0;
+            this.sessionsToday = data.sessionsToday || 0;
+            this.lastStudyDate = data.lastStudyDate || null;
+            this.studyHistory = data.studyHistory || {};
 
             this.saveState();
             this.render();
@@ -1333,17 +1492,35 @@
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-body').innerHTML = content;
         document.getElementById('modal-overlay').style.display = 'flex';
+
+        // Move keyboard/screen-reader focus into the dialog, and remember
+        // what had focus before it opened - a role="dialog" that never
+        // receives focus (or never gives it back) is invisible to anyone
+        // navigating by keyboard/screen reader, who'd otherwise stay
+        // "stuck" on whatever was focused underneath the overlay.
+        this._lastFocusedBeforeModal = document.activeElement;
+        const modalEl = document.querySelector('#modal-overlay .modal');
+        if (modalEl) modalEl.focus();
       }
-      
+
       closeModal() {
         document.getElementById('modal-overlay').style.display = 'none';
+        if (this._lastFocusedBeforeModal && document.contains(this._lastFocusedBeforeModal) && typeof this._lastFocusedBeforeModal.focus === 'function') {
+          this._lastFocusedBeforeModal.focus();
+        }
+        this._lastFocusedBeforeModal = null;
       }
-      
+
       setupModalClose() {
         const modal = document.getElementById('modal-overlay');
         if (modal) {
           modal.addEventListener('click', (e) => {
             if (e.target === modal) {
+              this.closeModal();
+            }
+          });
+          document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
               this.closeModal();
             }
           });
@@ -1776,13 +1953,13 @@
                   <h2 style="font-size: 1.3rem; color: var(--dark-navy); margin-bottom: 1.5rem; text-align: center;">כניסה</h2>
                   
                   <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
-                    <input type="email" id="login-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
+                    <label for="login-email" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
+                    <input type="email" id="login-email" autocomplete="email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
-                  
+
                   <div style="margin-bottom: 1.5rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה</label>
-                    <input type="password" id="login-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
+                    <label for="login-password" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה</label>
+                    <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
                   
                   <div id="login-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
@@ -1805,13 +1982,13 @@
                   <h2 style="font-size: 1.3rem; color: var(--dark-navy); margin-bottom: 1.5rem; text-align: center;">הרשמה</h2>
                   
                   <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
-                    <input type="email" id="register-email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
+                    <label for="register-email" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">דוא"ל</label>
+                    <input type="email" id="register-email" autocomplete="email" placeholder="your@email.com" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
-                  
+
                   <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה (לפחות 6 תווים)</label>
-                    <input type="password" id="register-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
+                    <label for="register-password" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">סיסמה (לפחות 6 תווים)</label>
+                    <input type="password" id="register-password" autocomplete="new-password" placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 2px; font-size: 1rem;">
                   </div>
                   
                   <div id="register-error" style="color: var(--red); margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
@@ -2373,8 +2550,8 @@
           return `
           <li class="session-word-item ${isCurrent ? 'active' : ''} ${isClickable ? 'clickable' : ''}"
               ${isClickable ? `onclick="app.jumpToWord(${w.id})" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.jumpToWord(${w.id})}"` : ''}>
-            <span class="status-dot ${w.status || 'red'}"></span>
-            <span>${w.english}</span>
+            <span class="status-dot ${w.status || 'red'}" aria-label="${w.status === 'green' ? 'שולט' : w.status === 'orange' ? 'בתהליך' : 'טרם נלמד'}" title="${w.status === 'green' ? 'שולט' : w.status === 'orange' ? 'בתהליך' : 'טרם נלמד'}"></span>
+            <span>${this.escapeHtml(w.english)}</span>
           </li>
         `;
         }).join('');
@@ -2393,13 +2570,12 @@
             </div>
 
             <div class="word-card swipe-area ${enterClass}" id="current-word-card">
-              <div class="word-emoji">${word.emoji}</div>
               <div class="english-word-row">
-                <span class="english-word">${word.english}</span>
+                <span class="english-word">${this.escapeHtml(word.english)}</span>
                 <button type="button" class="speak-btn" data-word="${this.escapeHtml(word.english)}" onclick="event.stopPropagation(); app.speakWord(this)" aria-label="השמע הגייה" title="השמע הגייה">🔊</button>
               </div>
-              <div class="hebrew-translation hidden" id="hebrew-word">${word.hebrew}</div>
-              <div class="example-sentence hidden" id="example-sentence">${word.example || ''}</div>
+              <div class="hebrew-translation hidden" id="hebrew-word">${this.escapeHtml(word.hebrew)}</div>
+              <div class="example-sentence hidden" id="example-sentence">${this.escapeHtml(word.example || '')}</div>
               <div id="toggle-hint" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">לחץ לגילוי התרגום</div>
               <button onclick="event.stopPropagation(); app.toggleNoteField(${word.id})" style="margin-top: 1.5rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">
                 📝 ${word.association ? 'ערוך רמז אישי' : 'הוסף רמז אישי - אסוציאציה מומלצת'}
@@ -2408,7 +2584,7 @@
                 <button onclick="app.suggestAssociation(${word.id})" type="button" style="margin-bottom: 0.6rem; background: var(--light-sage); border: 1px solid rgba(74, 122, 90, 0.25); color: var(--sage-green); cursor: pointer; font-size: 0.8rem; padding: 0.5rem 0.9rem; border-radius: 10px; font-weight: 500;">
                   💡 הצע לי אסוציאציה
                 </button>
-                <textarea id="assoc-${word.id}" placeholder="💭 כתוב דרך להיזכר, או לחץ למעלה לקבלת הצעה..." style="width: 100%; padding: 0.6rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 10px; min-height: 60px;" onchange="window.app.updateAssociation(${word.id}, this.value)">${word.association || ''}</textarea>
+                <textarea id="assoc-${word.id}" placeholder="💭 כתוב דרך להיזכר, או לחץ למעלה לקבלת הצעה..." style="width: 100%; padding: 0.6rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 10px; min-height: 60px;" onchange="window.app.updateAssociation(${word.id}, this.value)">${this.escapeHtml(word.association || '')}</textarea>
               </div>
               <div>
                 <button onclick="event.stopPropagation(); app.toggleFlag(${word.id})" style="margin-top: 0.75rem; background: none; border: none; color: ${word.flagged ? 'var(--red)' : 'var(--text-secondary)'}; cursor: pointer; font-size: 0.8rem;">
@@ -2583,7 +2759,7 @@
               ${flagged.map(w => `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light); gap: 0.75rem;">
                   <div>
-                    <strong>${w.english}</strong> - ${w.hebrew}
+                    <strong>${this.escapeHtml(w.english)}</strong> - ${this.escapeHtml(w.hebrew)}
                   </div>
                   <div style="display: flex; gap: 0.5rem; flex-shrink: 0;">
                     ${isOwner ? `<button onclick="app.editWordGlobal(${w.id})" class="btn btn-sm btn-secondary">✏️ ערוך</button>` : ''}
@@ -2700,7 +2876,7 @@
               ${mastered.map(w => `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light); gap: 0.75rem;">
                   <div>
-                    <strong>${w.english}</strong> - ${w.hebrew}
+                    <strong>${this.escapeHtml(w.english)}</strong> - ${this.escapeHtml(w.hebrew)}
                   </div>
                   <button onclick="app.unmasterWord(${w.id})" class="btn btn-sm btn-secondary" style="flex-shrink: 0;">החזר לשינון</button>
                 </div>
@@ -3220,7 +3396,7 @@
                     <div><strong>${this.escapeHtml(w.english)}</strong> - ${this.escapeHtml(w.hebrew)}</div>
                     <span style="color: var(--red); font-weight: 600; font-size: 0.8rem; flex-shrink: 0;">${w.failCount} פספוסים</span>
                   </div>
-                  <textarea id="leech-assoc-${w.id}" placeholder="💭 כתוב דרך להיזכר..." style="width: 100%; padding: 0.5rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 10px; min-height: 45px; margin-bottom: 0.5rem;" onchange="app.updateAssociation(${w.id}, this.value)">${w.association || ''}</textarea>
+                  <textarea id="leech-assoc-${w.id}" placeholder="💭 כתוב דרך להיזכר..." style="width: 100%; padding: 0.5rem; font-size: 0.85rem; direction: rtl; border: 1px solid var(--border-light); border-radius: 10px; min-height: 45px; margin-bottom: 0.5rem;" onchange="app.updateAssociation(${w.id}, this.value)">${this.escapeHtml(w.association || '')}</textarea>
                   <button onclick="app.reactivateLeech(${w.id})" class="btn btn-sm btn-secondary" style="width: 100%;">🔄 החזר לשינון</button>
                 </div>
               `).join('')}
