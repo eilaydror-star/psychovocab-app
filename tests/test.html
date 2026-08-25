@@ -49,14 +49,15 @@
 
   <script>
     // --- tiny test runner -----------------------------------------------
+    // test() only registers a case; they all run (in order, awaited one at
+    // a time) from the async runner at the bottom of this file, after every
+    // test() call below has finished registering. This lets a case be an
+    // async function (needed for anything going through a real Promise
+    // chain, like logout()) without the report section racing ahead of it.
     const results = [];
+    const testCases = [];
     function test(name, fn) {
-      try {
-        fn();
-        results.push({ name, pass: true });
-      } catch (e) {
-        results.push({ name, pass: false, error: e.message });
-      }
+      testCases.push({ name, fn });
     }
     function assert(cond, msg) {
       if (!cond) throw new Error(msg || 'assertion failed');
@@ -88,6 +89,7 @@
     app.showRestingModal = () => {};
     app.recordStudySession = () => {};
     app.startBreakTimer = () => {};
+    app.maybeCelebrateStreak = () => {};
 
     // ==== getCurrentTier ====================================================
 
@@ -398,28 +400,111 @@
       });
     });
 
-    // --- report --------------------------------------------------------
-    const list = document.getElementById('results');
-    let passCount = 0;
-    for (const r of results) {
-      const li = document.createElement('li');
-      if (r.pass) {
-        passCount++;
-        li.className = 'pass';
-        li.textContent = `✓ ${r.name}`;
-      } else {
-        li.className = 'fail';
-        li.textContent = `✗ ${r.name}\n  ${r.error}`;
+    // ==== getLocalDateKey / streak date boundary ==============================
+
+    test('getLocalDateKey: formats a date as local YYYY-MM-DD, not UTC', () => {
+      // A time chosen to sit on different calendar dates in UTC vs a
+      // positive-offset local zone (e.g. Israel) - 00:30 local, on a
+      // machine east of UTC, is still the previous day in UTC. Regression
+      // for recordStudySession() previously using toISOString() (UTC) for
+      // this, which could misfire the streak/day count near local midnight.
+      const halfPastMidnight = new Date(2026, 7, 25, 0, 30); // months are 0-indexed: August 25
+      assertEqual(app.getLocalDateKey(halfPastMidnight), '2026-08-25');
+    });
+
+    test('recordStudySession: uses the local calendar day, not UTC, for the streak/history key', () => {
+      const original = app.recordStudySession; // currently the no-op override above
+      delete app.recordStudySession; // fall back to the real prototype method for this one test
+      try {
+        app.studyHistory = {};
+        app.lastStudyDate = null;
+        app.currentStreak = 0;
+        app.sessionsToday = 0;
+        app.recordStudySession();
+        const expectedKey = app.getLocalDateKey();
+        assert(app.studyHistory[expectedKey] === 1, 'expected today\'s local-date key in studyHistory');
+        assertEqual(app.lastStudyDate, expectedKey);
+        assertEqual(app.currentStreak, 1);
+      } finally {
+        app.recordStudySession = original;
       }
-      list.appendChild(li);
-    }
-    const summary = document.getElementById('summary');
-    summary.textContent = `${passCount}/${results.length} passed`;
-    summary.className = passCount === results.length ? 'pass' : 'fail';
-    console.log(`TESTS: ${passCount}/${results.length} passed`);
-    if (passCount !== results.length) {
-      console.error('TESTS FAILED', results.filter(r => !r.pass));
-    }
+    });
+
+    // ==== logout: no progress leak to the next user on this device ==========
+
+    test('logout: clears in-memory state and this device\'s saved progress', async () => {
+      // logout() only does its cleanup inside logoutUser()'s .then(), and
+      // the real logoutUser() rejects immediately when Firebase isn't
+      // configured (see js/auth.js) - which is always true in this test
+      // environment. Stand in a resolving fake for the duration of this
+      // one test so the real cleanup path in js/app.js actually runs.
+      const originalLogoutUser = window.logoutUser;
+      window.logoutUser = () => Promise.resolve();
+      try {
+        app.words = [makeWord({ id: 'leaked-word', status: 'green' })];
+        app.currentStreak = 5;
+        app.studyHistory = { '2026-08-01': 2 };
+        app.currentSession = [app.words[0]];
+        app.sessionActive = true;
+        saveToLocalStorage({
+          words: app.words, allTimeStats: { totalAttempts: 9, totalCorrect: 9 },
+          currentStreak: 5, sessionsToday: 3, lastStudyDate: '2026-08-01', studyHistory: { '2026-08-01': 2 },
+          sessionActive: true, sessionWordIds: ['leaked-word'], sessionStats: { correct: 1, incorrect: 0, streak: 1 },
+          lastSaved: new Date().toISOString()
+        });
+
+        await app.logout();
+        // logout()'s cleanup runs inside a .then() callback chained off the
+        // (now faked) logoutUser() promise - app.logout() itself doesn't
+        // return that chain, so give the microtask queue a couple of turns
+        // to actually run it before asserting.
+        await Promise.resolve();
+        await Promise.resolve();
+
+        assert(!app.words.some(w => w.id === 'leaked-word'), 'in-memory words should be reset to the fresh dataset, not carry over the outgoing account\'s words');
+        assertEqual(app.currentStreak, 0);
+        assertEqual(Object.keys(app.studyHistory).length, 0);
+        assertEqual(app.sessionActive, false);
+        assertEqual(app.currentSession.length, 0);
+        assertEqual(loadFromLocalStorage(), null, 'this device\'s saved progress should be cleared, not left for the next guest/account to inherit');
+      } finally {
+        window.logoutUser = originalLogoutUser;
+      }
+    });
+
+    // --- run everything, then report ------------------------------------
+    (async () => {
+      for (const { name, fn } of testCases) {
+        try {
+          await fn();
+          results.push({ name, pass: true });
+        } catch (e) {
+          results.push({ name, pass: false, error: e.message });
+        }
+      }
+
+      const list = document.getElementById('results');
+      let passCount = 0;
+      for (const r of results) {
+        const li = document.createElement('li');
+        if (r.pass) {
+          passCount++;
+          li.className = 'pass';
+          li.textContent = `✓ ${r.name}`;
+        } else {
+          li.className = 'fail';
+          li.textContent = `✗ ${r.name}\n  ${r.error}`;
+        }
+        list.appendChild(li);
+      }
+      const summary = document.getElementById('summary');
+      summary.textContent = `${passCount}/${results.length} passed`;
+      summary.className = passCount === results.length ? 'pass' : 'fail';
+      console.log(`TESTS: ${passCount}/${results.length} passed`);
+      if (passCount !== results.length) {
+        console.error('TESTS FAILED', results.filter(r => !r.pass));
+      }
+    })();
   </script>
 </body>
 </html>

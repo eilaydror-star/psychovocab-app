@@ -244,11 +244,24 @@
         this.showModal('⏰ זמן להפסקה?', content);
       }
 
+      // 'YYYY-MM-DD' in the user's local calendar day, not UTC. toISOString()
+      // (used here previously) reports the UTC date, which drifts from the
+      // user's actual local date near midnight for any non-UTC timezone -
+      // e.g. a session at 1am in Israel (UTC+2/+3) can still read as
+      // "yesterday" in UTC, throwing the streak/day-boundary math off by a
+      // day depending on time of day and DST.
+      getLocalDateKey(date = new Date()) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+
       recordStudySession() {
         // Tracks both a day-level streak (don't break the chain) and a
         // same-day session count (multiple short visits per day is how
         // real spaced repetition actually works, not one long daily cram).
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.getLocalDateKey();
         this.studyHistory[today] = (this.studyHistory[today] || 0) + 1;
 
         if (this.lastStudyDate === today) {
@@ -256,7 +269,7 @@
           return;
         }
 
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const yesterday = this.getLocalDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
         this.currentStreak = (this.lastStudyDate === yesterday) ? this.currentStreak + 1 : 1;
         this.lastStudyDate = today;
         this.sessionsToday = 1;
@@ -1899,6 +1912,27 @@
         this.userSkippedLogin = false; // Reset so login screen shows again
         logoutUser()
           .then(() => {
+            // Wipe this device's local copy of the outgoing account's
+            // progress. saveState() writes every autosave to this same
+            // shared localStorage key regardless of login state, so
+            // leaving it in place would hand this account's words/streak/
+            // history to whoever uses this browser next as a guest or a
+            // brand-new account - loadProgressFromFirebase() falls back to
+            // local storage whenever the new account has no cloud snapshot
+            // yet (e.g. a fresh registration), silently attributing it to
+            // them and then syncing it into their Firebase account on the
+            // next save.
+            localStorage.removeItem(STORAGE_KEY);
+            this.words = this.initializeWords();
+            this.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
+            this.currentStreak = 0;
+            this.sessionsToday = 0;
+            this.lastStudyDate = null;
+            this.studyHistory = {};
+            this.sessionActive = false;
+            this.currentSession = [];
+            this.sessionIndex = 0;
+            this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
             this.render();
           })
           .catch((error) => {
@@ -2654,7 +2688,7 @@
         const days = [];
         for (let i = 13; i >= 0; i--) {
           const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-          const key = d.toISOString().split('T')[0];
+          const key = this.getLocalDateKey(d);
           days.push({ count: this.studyHistory[key] || 0, label: d.toLocaleDateString('he-IL', { weekday: 'short' }) });
         }
         const maxCount = Math.max(1, ...days.map(d => d.count));
