@@ -2905,10 +2905,15 @@
         // Send the missed word to the back of this session's queue instead
         // of leaving it at the front - otherwise it would immediately come
         // back up as the next card. It still resurfaces later in the same
-        // set, just after other words get a turn.
+        // set, just after other words get a turn. Unless it just crossed
+        // the leech threshold, in which case it's pulled out of the
+        // session entirely - leaving it in would contradict the leech
+        // modal's promise that it exits rotation immediately.
         if (prevIndex !== -1) {
           this.currentSession.splice(prevIndex, 1);
-          this.currentSession.push(word);
+          if (!justBecameLeech) {
+            this.currentSession.push(word);
+          }
         }
 
         this.sessionStats.incorrect++;
