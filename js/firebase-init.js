@@ -44,11 +44,15 @@ function initializeFirebase() {
       if (window.app) {
         window.app.currentUser = user;
         // First callback resolves whether a previous session is being
-        // restored - flips the boot screen over to the real login/start
-        // screen instead of leaving a stale "loading" state or, worse,
-        // flashing the login form before the restored session is known.
+        // restored. For a logged-out user that's immediate, so it flips
+        // the boot screen over to the real login/start screen right here.
+        // For a logged-in user, app.js's loadProgressFromFirebase() (or
+        // handleGuestToAccountTransition(), which calls it) only sets
+        // authChecked once that user's actual cloud progress has finished
+        // loading - otherwise the boot screen would flash whatever stale
+        // session happened to be cached in localStorage before immediately
+        // correcting itself once the real data arrives.
         const wasChecked = window.app.authChecked;
-        window.app.authChecked = true;
 
         if (user) {
           console.log('User logged in:', user.email);
@@ -73,6 +77,7 @@ function initializeFirebase() {
           }
         } else {
           console.log('No user logged in');
+          window.app.authChecked = true;
           if (!wasChecked) window.app.render();
         }
       }

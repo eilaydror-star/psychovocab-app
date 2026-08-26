@@ -36,11 +36,15 @@
         this._lastRenderedWordId = null;
         this.currentUser = null; // Firebase user
         this.userSkippedLogin = false; // Track if user skipped login screen
-        // True once we know whether a previous session is being restored:
+        // True once we know the *authoritative* session/login state:
         // immediately if Firebase isn't configured (nothing async to wait
         // on), otherwise only after auth.onAuthStateChanged's first
-        // callback. Gates getScreenType() so a returning user sees a brief
-        // loading screen instead of a flash of the login form.
+        // callback AND (for a logged-in user) that user's cloud progress
+        // has actually finished loading - see loadProgressFromFirebase().
+        // Gates getScreenType() so a returning user sees a brief loading
+        // screen instead of a flash of the login form, or worse, a flash
+        // into a stale locally-cached session (e.g. mid-rehearsal) that
+        // gets immediately overwritten once the real cloud data arrives.
         this.authChecked = !firebaseReady;
         
         // Difficulty tier: by default the app works through 'easy' words
@@ -1204,6 +1208,7 @@
         // Load progress from Firebase for current user
         if (!firebaseReady || !currentUser) {
           this.loadProgressFromLocalStorage();
+          this.authChecked = true;
           return;
         }
 
@@ -1249,10 +1254,12 @@
               this.studyHistory = data.studyHistory ?? this.studyHistory;
               this.difficultyOverride = data.difficultyOverride ?? this.difficultyOverride;
               this.restoreSession(data, freshWords);
+              this.authChecked = true;
               this.render();
             } else {
               console.log('No Firebase progress found, using local');
               this.loadProgressFromLocalStorage();
+              this.authChecked = true;
               this.render();
             }
             this.loadFriends();
@@ -1260,6 +1267,7 @@
           .catch((error) => {
             console.warn('Failed to load from Firebase:', error.message);
             this.loadProgressFromLocalStorage();
+            this.authChecked = true;
             this.render();
           });
       }
@@ -1690,8 +1698,11 @@
         // visits are a returning, already-logged-in user, so jumping
         // straight to 'login' would flash the login form on every load
         // before immediately flipping to the start screen once auth
-        // resolves.
-        if (!this.authChecked && !this.sessionActive) return 'loading';
+        // resolves. Deliberately ignores this.sessionActive here (unlike
+        // the checks below) - a locally-cached session isn't trustworthy
+        // yet for a Firebase user, since the real cloud progress (which
+        // may have no active session at all) hasn't loaded.
+        if (!this.authChecked) return 'loading';
 
         // Show the login screen only when there's nothing else to show
         // instead: no logged-in user, login wasn't explicitly skipped, and
@@ -2254,16 +2265,22 @@
                 ? 'הרמה מתקדמת אוטומטית - ברגע ששולטים בכל המילים ברמה הנוכחית, נפתחת הרמה הבאה.'
                 : 'קבעת רמה ידנית - היא לא תתקדם אוטומטית עד שתעבור בחזרה למצב אוטומטי.'}
             </div>
-            <div style="margin-top: 1rem;">
-              <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 0.35rem;">
+            <div style="margin-top: 1rem; display: flex; flex-direction: column; align-items: center;">
+              <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 0.5rem;">
                 בחירת רמה
               </label>
-              <select onchange="app.setDifficultyOverride(this.value)" style="padding: 0.5rem 0.75rem; border-radius: 2px; border: 1px solid var(--border-light); font-family: inherit; font-size: 0.95rem;">
-                <option value="auto" ${isAuto ? 'selected' : ''}>🤖 אוטומטי (ברירת מחדל)</option>
-                <option value="easy" ${this.difficultyOverride === 'easy' ? 'selected' : ''}>🟢 קל</option>
-                <option value="moderate" ${this.difficultyOverride === 'moderate' ? 'selected' : ''}>🟡 בינוני</option>
-                <option value="hard" ${this.difficultyOverride === 'hard' ? 'selected' : ''}>🔴 קשה</option>
-              </select>
+              <div class="tier-segmented" role="group" aria-label="בחירת רמה">
+                ${[
+                  { value: 'auto', label: '🤖 אוטומטי', active: isAuto },
+                  { value: 'easy', label: '🟢 קל', active: this.difficultyOverride === 'easy' },
+                  { value: 'moderate', label: '🟡 בינוני', active: this.difficultyOverride === 'moderate' },
+                  { value: 'hard', label: '🔴 קשה', active: this.difficultyOverride === 'hard' }
+                ].map(t => `
+                  <button type="button" class="tier-segment-btn${t.active ? ' active' : ''}" onclick="app.setDifficultyOverride('${t.value}')">
+                    ${t.label}
+                  </button>
+                `).join('')}
+              </div>
             </div>
           </div>
         `;

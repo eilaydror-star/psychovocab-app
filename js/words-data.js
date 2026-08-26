@@ -2363,7 +2363,7 @@
           { id: 2799, english: "intend", hebrew: "לייעד, להתכוון", example: "I intend to finish the report by Friday.", status: "red", streak: 0, association: "", difficulty: "easy", testProbability: 0.9 },
           { id: 2802, english: "reconstructive", hebrew: "משחזר, משקם", example: "The doctors performed reconstructive surgery on his hand.", status: "red", streak: 0, association: "", difficulty: "moderate", testProbability: 0.7 },
           { id: 2804, english: "irreconcilable", hebrew: "בלתי ניתן לפיוס", example: "Their views on the topic were completely irreconcilable.", status: "red", streak: 0, association: "", difficulty: "hard", testProbability: 0.35 },
-          { id: 2806, english: "graspe", hebrew: "נתפס", example: "He managed to graspe the rope just in time.", status: "red", streak: 0, association: "", difficulty: "easy", testProbability: 0.9 },
+          { id: 2806, english: "grasp", hebrew: "לתפוס / לאחוז", example: "He managed to grasp the rope just in time.", status: "red", streak: 0, association: "", difficulty: "easy", testProbability: 0.9 },
           { id: 2807, english: "chasm", hebrew: "תהום, בקיע", example: "The hikers looked down into the deep chasm.", status: "red", streak: 0, association: "", difficulty: "moderate", testProbability: 0.7 },
           { id: 2808, english: "viable", hebrew: "מעשי, אפשרי", example: "The plan seemed viable after further research.", status: "red", streak: 0, association: "", difficulty: "moderate", testProbability: 0.7 },
           { id: 2811, english: "extravagantly", hebrew: "בבזבזנות, בפזרנות", example: "They spent extravagantly on the wedding party.", status: "red", streak: 0, association: "", difficulty: "moderate", testProbability: 0.7 },
