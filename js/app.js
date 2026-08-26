@@ -43,10 +43,13 @@
         // loading screen instead of a flash of the login form.
         this.authChecked = !firebaseReady;
         
-        // Difficulty tier: no manual picker any more - the app always
-        // works through 'easy' words first, then automatically starts
-        // introducing 'moderate' once every easy word is mastered (green),
-        // then 'hard' once moderate is mastered. See getCurrentTier().
+        // Difficulty tier: by default the app works through 'easy' words
+        // first, then automatically starts introducing 'moderate' once
+        // every easy word is mastered (green), then 'hard' once moderate
+        // is mastered. A learner can instead pin a specific tier via
+        // setDifficultyOverride() - null means "use the automatic
+        // progression" (the default). See getCurrentTier().
+        this.difficultyOverride = null;
 
         // Reading timer
         this.readingTimerActive = false;
@@ -130,13 +133,17 @@
         return WORDS_DATA.map(w => ({ ...w, dueAt: null, flagged: false, updatedAt: null, failCount: 0, leech: false }));
       }
       
-      // Which difficulty tier the user is currently working through. There
-      // is no manual picker for this any more - it's derived purely from
-      // mastery: stay on 'easy' until every easy word is green, then move
-      // to 'moderate', then 'hard'. Recomputed on demand (not stored), so
-      // it can never go stale relative to this.words.
+      // Which difficulty tier the user is currently working through. By
+      // default this is derived purely from mastery: stay on 'easy' until
+      // every easy word is green, then move to 'moderate', then 'hard'.
+      // If the learner pinned a tier via setDifficultyOverride(), that
+      // tier is returned directly instead. Recomputed on demand (not
+      // stored), so it can never go stale relative to this.words.
       getCurrentTier() {
         const tiers = ['easy', 'moderate', 'hard'];
+        if (this.difficultyOverride && tiers.includes(this.difficultyOverride)) {
+          return this.difficultyOverride;
+        }
         for (const tier of tiers) {
           const tierWords = this.words.filter(w => w.difficulty === tier);
           if (tierWords.length === 0) continue; // no words at this tier - skip it
@@ -149,6 +156,15 @@
           if (!allMastered) return tier;
         }
         return 'hard'; // everything mastered - nothing left to advance to
+      }
+
+      // Called from the difficulty picker on the start screen. `tier` is
+      // 'auto', 'easy', 'moderate', or 'hard' - 'auto' clears the override
+      // and restores the default easy->moderate->hard progression.
+      setDifficultyOverride(tier) {
+        this.difficultyOverride = (tier === 'auto') ? null : tier;
+        this.saveProgress();
+        this.render();
       }
 
       startNewSession() {
@@ -959,6 +975,7 @@
           sessionActive: this.sessionActive,
           sessionWordIds: this.currentSession.map(w => w.id),
           sessionStats: this.sessionStats,
+          difficultyOverride: this.difficultyOverride,
           lastSaved: new Date().toISOString()
         };
         if (saveToLocalStorage(state)) {
@@ -1151,7 +1168,11 @@
         const sessionActive = keepRemoteSession ? true : this.sessionActive;
         const sessionStats = keepRemoteSession ? (remoteData.sessionStats || this.sessionStats) : this.sessionStats;
 
-        return { allTimeStats, currentStreak, sessionsToday, lastStudyDate, studyHistory, sessionActive, sessionStats, _keepRemoteSession: keepRemoteSession };
+        // difficultyOverride is a simple device preference, not a counter -
+        // just keep whatever this device currently has set.
+        const difficultyOverride = this.difficultyOverride;
+
+        return { allTimeStats, currentStreak, sessionsToday, lastStudyDate, studyHistory, sessionActive, sessionStats, difficultyOverride, _keepRemoteSession: keepRemoteSession };
       }
 
       // Publishes just the stats needed for the friends feature (never
@@ -1220,6 +1241,7 @@
               this.sessionsToday = data.sessionsToday ?? this.sessionsToday;
               this.lastStudyDate = data.lastStudyDate ?? this.lastStudyDate;
               this.studyHistory = data.studyHistory ?? this.studyHistory;
+              this.difficultyOverride = data.difficultyOverride ?? this.difficultyOverride;
               this.restoreSession(data, freshWords);
               this.render();
             } else {
@@ -1277,6 +1299,7 @@
           this.sessionsToday = 0;
           this.lastStudyDate = null;
           this.studyHistory = {};
+          this.difficultyOverride = null;
           this.sessionActive = false;
           this.currentSession = [];
         }
@@ -1382,6 +1405,7 @@
             this.sessionsToday = data.sessionsToday || 0;
             this.lastStudyDate = data.lastStudyDate || null;
             this.studyHistory = data.studyHistory || {};
+            this.difficultyOverride = data.difficultyOverride || null;
             this.lastSaved = data.lastSaved ? new Date(data.lastSaved) : null;
             this.restoreSession(data, freshWords);
         }
@@ -1833,7 +1857,7 @@
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">📅 איך ללמוד נכון</h3>
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
               <div style="margin-bottom: 0.8rem;">✅ עדיף כמה שיעורים קצרים ביום מאשר שיעור ארוך אחד - זה מה שה-🔥 רצף וה-🎯 שיעורים היום בראש המסך עוקבים אחריו.</div>
-              <div style="margin-bottom: 0.8rem;">✅ הרמה (קל/בינוני/קשה) עולה אוטומטית - ברגע ששולטים בכל מילות הרמה הנוכחית, נפתחת הרמה הבאה. אין צורך לבחור ידנית.</div>
+              <div style="margin-bottom: 0.8rem;">✅ כברירת מחדל הרמה (קל/בינוני/קשה) עולה אוטומטית - ברגע ששולטים בכל מילות הרמה הנוכחית, נפתחת הרמה הבאה. אפשר גם לבחור רמה ידנית במסך הראשי.</div>
               <div>✅ ההתקדמות נשמרת אוטומטית במכשיר, ואם תתחבר עם חשבון - גם מסתנכרנת בין מכשירים.</div>
             </div>
           </div>
@@ -2154,6 +2178,7 @@
             this.sessionsToday = 0;
             this.lastStudyDate = null;
             this.studyHistory = {};
+            this.difficultyOverride = null;
             this.sessionActive = false;
             this.currentSession = [];
             this.sessionIndex = 0;
@@ -2197,13 +2222,15 @@
         }
 
 
-        // Current-tier banner: no manual difficulty picker any more - the
-        // app decides the tier automatically (see getCurrentTier()) and
-        // just shows the learner where they stand within it.
+        // Current-tier banner: shows where the learner stands within the
+        // current tier, plus a picker letting them pin a specific tier
+        // instead of the default automatic easy->moderate->hard
+        // progression (see getCurrentTier()/setDifficultyOverride()).
         const tierLabels = { easy: '🟢 קל', moderate: '🟡 בינוני', hard: '🔴 קשה' };
         const currentTier = this.getCurrentTier();
         const currentTierWords = this.words.filter(w => w.difficulty === currentTier);
         const currentTierMastered = currentTierWords.filter(w => w.status === 'green').length;
+        const isAuto = !this.difficultyOverride;
 
         html += `
           <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem; border: 1px solid var(--border-light); text-align: center;">
@@ -2217,7 +2244,20 @@
               ${currentTierMastered.toLocaleString()}/${currentTierWords.length.toLocaleString()} מילים ברמה זו שולטו
             </div>
             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.6rem;">
-              הרמה מתקדמת אוטומטית - ברגע ששולטים בכל המילים ברמה הנוכחית, נפתחת הרמה הבאה.
+              ${isAuto
+                ? 'הרמה מתקדמת אוטומטית - ברגע ששולטים בכל המילים ברמה הנוכחית, נפתחת הרמה הבאה.'
+                : 'קבעת רמה ידנית - היא לא תתקדם אוטומטית עד שתעבור בחזרה למצב אוטומטי.'}
+            </div>
+            <div style="margin-top: 1rem;">
+              <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 0.35rem;">
+                בחירת רמה
+              </label>
+              <select onchange="app.setDifficultyOverride(this.value)" style="padding: 0.5rem 0.75rem; border-radius: 2px; border: 1px solid var(--border-light); font-family: inherit; font-size: 0.95rem;">
+                <option value="auto" ${isAuto ? 'selected' : ''}>🤖 אוטומטי (ברירת מחדל)</option>
+                <option value="easy" ${this.difficultyOverride === 'easy' ? 'selected' : ''}>🟢 קל</option>
+                <option value="moderate" ${this.difficultyOverride === 'moderate' ? 'selected' : ''}>🟡 בינוני</option>
+                <option value="hard" ${this.difficultyOverride === 'hard' ? 'selected' : ''}>🔴 קשה</option>
+              </select>
             </div>
           </div>
         `;
@@ -2885,6 +2925,78 @@
           `;
         }
         this.showModal('✅ מילים ששלטתי בהן', content);
+      }
+
+      // Full A-Z reference list of every word in the deck, grouped by
+      // difficulty tier and collapsed by default (opening all three at
+      // once would render ~4000 rows). The search box filters by matching
+      // ids in-memory first (cheap - a few thousand string compares) and
+      // then just toggles DOM visibility, rather than re-rendering.
+      showFullWordListModal() {
+        const groups = [
+          { key: 'easy', label: '🟢 קל' },
+          { key: 'moderate', label: '🟡 בינוני' },
+          { key: 'hard', label: '🔴 קשה' }
+        ];
+        const statusColor = { red: 'var(--red)', orange: 'var(--orange)', green: 'var(--green)' };
+
+        const renderRow = (w) => `
+          <div class="full-word-row" data-id="${w.id}" style="display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border-light);">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: ${statusColor[w.status] || 'var(--red)'}; flex-shrink: 0;"></div>
+            <div style="flex: 1; min-width: 0;">
+              <strong>${this.escapeHtml(w.english)}</strong> - ${this.escapeHtml(w.hebrew)}
+            </div>
+          </div>
+        `;
+
+        const groupsHtml = groups.map(g => {
+          const words = this.words.filter(w => w.difficulty === g.key);
+          const mastered = words.filter(w => w.status === 'green').length;
+          return `
+            <details class="full-word-group" style="margin-bottom: 0.75rem;">
+              <summary style="cursor: pointer; font-weight: 600; padding: 0.6rem 0;">
+                ${g.label} - ${words.length.toLocaleString()} מילים (${mastered.toLocaleString()} שולט)
+              </summary>
+              <div>${words.map(renderRow).join('')}</div>
+            </details>
+          `;
+        }).join('');
+
+        const content = `
+          <div>
+            <input type="text" id="full-word-list-search" placeholder="חיפוש מילה..."
+              oninput="app.filterFullWordList(this.value)"
+              style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--border-light); border-radius: 2px; font-family: inherit; font-size: 0.95rem; margin-bottom: 1rem; box-sizing: border-box; direction: rtl;">
+            <div style="max-height: 55vh; overflow-y: auto;">
+              ${groupsHtml}
+            </div>
+          </div>
+        `;
+
+        this.showModal(`📋 רשימת כל המילים (${this.words.length.toLocaleString()})`, content);
+      }
+
+      filterFullWordList(query) {
+        const q = query.trim().toLowerCase();
+        const matchedIds = q
+          ? new Set(this.words.filter(w => w.english.toLowerCase().includes(q) || w.hebrew.toLowerCase().includes(q)).map(w => w.id))
+          : null;
+
+        document.querySelectorAll('#modal-body .full-word-row').forEach(row => {
+          const visible = !matchedIds || matchedIds.has(Number(row.dataset.id));
+          row.style.display = visible ? 'flex' : 'none';
+        });
+
+        document.querySelectorAll('#modal-body .full-word-group').forEach(group => {
+          if (!q) {
+            group.style.display = '';
+            group.open = false;
+            return;
+          }
+          const hasVisible = Array.from(group.querySelectorAll('.full-word-row')).some(r => r.style.display !== 'none');
+          group.style.display = hasVisible ? '' : 'none';
+          group.open = true;
+        });
       }
 
       showProgressModal() {
