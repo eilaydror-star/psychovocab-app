@@ -2486,6 +2486,10 @@
               ✅ מילים ששלטתי בהן${this.words.filter(w => w.status === 'green').length > 0 ? ` (${this.words.filter(w => w.status === 'green').length})` : ''}
             </button>
 
+            <button class="btn btn-secondary" onclick="app.showFullWordListModal()" style="width: 100%; margin-top: 0.75rem;">
+              📋 רשימת כל המילים (${this.words.length.toLocaleString()})
+            </button>
+
             ${currentUser ? `
               <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-light);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -2941,11 +2945,14 @@
         const statusColor = { red: 'var(--red)', orange: 'var(--orange)', green: 'var(--green)' };
 
         const renderRow = (w) => `
-          <div class="full-word-row" data-id="${w.id}" style="display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border-light);">
+          <div class="full-word-row" data-id="${w.id}" onclick="app.toggleFullWordListMeaning(this)"
+            style="display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.3rem; border-bottom: 1px solid var(--border-light); cursor: pointer;">
             <div style="width: 10px; height: 10px; border-radius: 50%; background: ${statusColor[w.status] || 'var(--red)'}; flex-shrink: 0;"></div>
             <div style="flex: 1; min-width: 0;">
-              <strong>${this.escapeHtml(w.english)}</strong> - ${this.escapeHtml(w.hebrew)}
+              <strong>${this.escapeHtml(w.english)}</strong>
+              <span class="full-word-meaning" style="display: none; color: var(--text-secondary);"> - ${this.escapeHtml(w.hebrew)}</span>
             </div>
+            <span class="full-word-hint" style="font-size: 0.75rem; color: var(--text-secondary); flex-shrink: 0;">הקש לתרגום 👆</span>
           </div>
         `;
 
@@ -2974,6 +2981,15 @@
         `;
 
         this.showModal(`📋 רשימת כל המילים (${this.words.length.toLocaleString()})`, content);
+      }
+
+      toggleFullWordListMeaning(rowEl) {
+        const meaning = rowEl.querySelector('.full-word-meaning');
+        const hint = rowEl.querySelector('.full-word-hint');
+        if (!meaning) return;
+        const revealed = meaning.style.display !== 'none';
+        meaning.style.display = revealed ? 'none' : 'inline';
+        if (hint) hint.style.display = revealed ? '' : 'none';
       }
 
       filterFullWordList(query) {
