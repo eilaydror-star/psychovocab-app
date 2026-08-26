@@ -248,10 +248,18 @@
       // fatigue (lots of wrong answers/re-drills), not focus.
       startBreakTimer() {
         this.clearBreakTimer();
+        this._armBreakTimer(7 * 60 * 1000);
+      }
+
+      _armBreakTimer(ms) {
         this.breakTimerId = setTimeout(() => {
           this.breakTimerId = null;
+          this._breakTimerRemainingMs = null;
+          this._breakTimerArmedAt = null;
           this.showBreakRecommendationModal();
-        }, 7 * 60 * 1000);
+        }, ms);
+        this._breakTimerArmedAt = Date.now();
+        this._breakTimerRemainingMs = ms;
       }
 
       clearBreakTimer() {
@@ -259,6 +267,28 @@
           clearTimeout(this.breakTimerId);
           this.breakTimerId = null;
         }
+        this._breakTimerRemainingMs = null;
+        this._breakTimerArmedAt = null;
+      }
+
+      // Pauses the 7-minute break-nudge clock while the app is backgrounded
+      // (tab switched away, phone locked, or the user goes to the phone's
+      // home screen in the installed PWA) - otherwise the countdown keeps
+      // running in real time and the modal can fire the instant someone
+      // comes back, even though they weren't actually rehearsing.
+      pauseBreakTimerForBackground() {
+        if (!this.breakTimerId) return;
+        const elapsed = Date.now() - this._breakTimerArmedAt;
+        const remaining = Math.max(0, this._breakTimerRemainingMs - elapsed);
+        clearTimeout(this.breakTimerId);
+        this.breakTimerId = null;
+        this._breakTimerRemainingMs = remaining;
+      }
+
+      resumeBreakTimerFromBackground() {
+        if (!this.sessionActive) return;
+        if (this._breakTimerRemainingMs == null) return;
+        this._armBreakTimer(this._breakTimerRemainingMs);
       }
 
       showBreakRecommendationModal() {
@@ -1030,7 +1060,12 @@
         };
         window.addEventListener('beforeunload', flush);
         document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'hidden') flush();
+          if (document.visibilityState === 'hidden') {
+            flush();
+            this.pauseBreakTimerForBackground();
+          } else {
+            this.resumeBreakTimerFromBackground();
+          }
         });
       }
       
