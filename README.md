@@ -8,7 +8,7 @@ Live site: https://eilaydror-star.github.io/psychovocab-app/
 
 - 4,000 English↔Hebrew word pairs, split into easy / moderate / hard difficulty tiers
 - A traffic-light system (red → orange → green) tracks mastery per word, using spaced repetition (a word must be answered correctly twice in a row, a few hours apart, to be marked mastered)
-- No manual difficulty picker - the app always works through the easy tier first, and automatically unlocks moderate once every easy word is green, then hard once moderate is green (`getCurrentTier()` in `js/app.js`)
+- By default the app works through the easy tier first, and automatically unlocks moderate once every easy word is green, then hard once moderate is green (`getCurrentTier()` in `js/app.js`). A picker on the start screen lets the user pin a specific tier instead (`setDifficultyOverride()`), overriding the automatic progression until switched back to "Auto"
 - Each 7-word study set is drawn only from the user's current tier, from a capped pool of already-started words plus a limited number of never-attempted ones, so a session never surfaces words the user hasn't actually reached yet
 - If you exit mid-set, the exact words, their order, and your progress within that set are saved (to `localStorage` and synced to Firebase) and automatically resumed the next time the app opens, instead of starting a new random session
 - During a session, a side list shows every word in the current set, color-coded red/orange/green as you go - a sidebar next to the word card on wide screens, collapsing to a drawer below it on narrow/mobile screens
