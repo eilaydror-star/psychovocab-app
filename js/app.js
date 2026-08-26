@@ -69,6 +69,13 @@
         this.sentenceGameAnswered = false;
         this.sentenceGameSelectedId = null;
         this.sentenceGameAddedIds = new Set();
+        this.sentenceGameMissedWords = [];
+        // Remembered tier/round-size picks from the setup modal (see
+        // showSentenceGameSetupModal) - undefined until the learner opens
+        // it the first time, at which point startSentenceGame() seeds
+        // sensible defaults ('all' tiers, 10 questions).
+        this._sentenceSetupTier = undefined;
+        this._sentenceSetupSize = undefined;
 
         // Reading timer
         this.readingTimerActive = false;
@@ -3627,6 +3634,94 @@
         return { word, sentence, optionWords };
       }
 
+      // How many green words in a given tier can actually be turned into a
+      // valid question (has an example sentence containing the word as a
+      // whole word, and at least 3 distinct distractors) - drives both the
+      // setup modal's live counts and the disabled state of its start
+      // button. Recomputed on demand rather than cached, since it depends
+      // on this.words which changes as the learner masters more words.
+      countEligibleSentenceWords(tier) {
+        const mastered = this.words.filter(w => w.status === 'green' && (tier === 'all' || w.difficulty === tier));
+        return mastered.filter(w => this.buildSentenceQuestion(w, this.words) !== null).length;
+      }
+
+      // Entry point from the start-screen button - opens the tier/round-
+      // size picker instead of jumping straight into a fixed 10-question
+      // round, so the learner controls both which mastered words get
+      // re-checked and how long the round runs (see launchSentenceGame()
+      // for where the actual game starts).
+      startSentenceGame() {
+        if (this._sentenceSetupTier === undefined) this._sentenceSetupTier = 'all';
+        if (this._sentenceSetupSize === undefined) this._sentenceSetupSize = 10;
+        this.showSentenceGameSetupModal();
+      }
+
+      setSentenceGameSetupTier(tier) {
+        this._sentenceSetupTier = tier;
+        this.showSentenceGameSetupModal();
+      }
+
+      setSentenceGameSetupSize(size) {
+        this._sentenceSetupSize = size === 'all' ? 'all' : parseInt(size, 10);
+        this.showSentenceGameSetupModal();
+      }
+
+      showSentenceGameSetupModal() {
+        const tiers = [
+          { value: 'all', label: '🌈 כל הרמות' },
+          { value: 'easy', label: '🟢 קל' },
+          { value: 'moderate', label: '🟡 בינוני' },
+          { value: 'hard', label: '🔴 קשה' }
+        ];
+        const sizeOptions = [10, 20, 'all'];
+        const currentEligible = this.countEligibleSentenceWords(this._sentenceSetupTier);
+        const notEnough = currentEligible < 4;
+
+        const content = `
+          <div style="text-align: center;">
+            <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+              בחרו אילו מילים ששלטתם בהן לתרגל, וכמה שאלות בסבב.
+            </p>
+
+            <div style="margin-bottom: 1.25rem;">
+              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">רמה</div>
+              <div class="tier-segmented" role="group" aria-label="בחירת רמה לתרגול">
+                ${tiers.map(t => `
+                  <button type="button" class="tier-segment-btn${this._sentenceSetupTier === t.value ? ' active' : ''}" onclick="app.setSentenceGameSetupTier('${t.value}')">
+                    ${t.label}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">מספר שאלות בסבב</div>
+              <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                ${sizeOptions.map(s => `
+                  <button type="button" class="btn btn-sm ${this._sentenceSetupSize === s ? 'btn-primary' : 'btn-secondary'}" onclick="app.setSentenceGameSetupSize('${s}')">
+                    ${s === 'all' ? `כל ה-${currentEligible}` : s}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem;">
+              ${currentEligible.toLocaleString()} מילים ירוקות זמינות לתרגול ברמה שנבחרה
+            </div>
+
+            <button class="btn btn-primary" onclick="app.launchSentenceGame()" ${notEnough ? 'disabled' : ''} style="width: 100%;">
+              🧩 התחל תרגול
+            </button>
+            ${notEnough ? `
+              <div style="color: var(--red); font-size: 0.8rem; margin-top: 0.6rem;">
+                אין מספיק מילים ירוקות ברמה זו (צריך לפחות 4). שננו עוד קצת או בחרו רמה אחרת.
+              </div>
+            ` : ''}
+          </div>
+        `;
+        this.showModal('🧩 הגדרת תרגול השלמת משפטים', content);
+      }
+
       // Quizzes words the learner already marked as known (green) with a
       // psychometric-style sentence completion - the normal flashcard
       // session never shows green words again (see renderSession), so this
@@ -3635,23 +3730,26 @@
       // answerSentenceGame) instead of just recording a score, since a
       // missed "known" word is exactly the situation the app should react
       // to automatically.
-      startSentenceGame() {
-        const masteredWords = this.words.filter(w => w.status === 'green');
-        const questions = masteredWords
+      launchSentenceGame() {
+        const tier = this._sentenceSetupTier;
+        const size = this._sentenceSetupSize;
+        const masteredWords = this.words.filter(w => w.status === 'green' && (tier === 'all' || w.difficulty === tier));
+        let questions = masteredWords
           .sort(() => Math.random() - 0.5)
           .map(w => this.buildSentenceQuestion(w, this.words))
-          .filter(Boolean)
-          .slice(0, 10);
+          .filter(Boolean);
 
         if (questions.length < 4) {
-          this.showModal('🧩 עדיין אין מספיק מילים', `
-            <p style="text-align: center; line-height: 1.8;">
-              כדי לתרגל השלמת משפטים צריך לפחות כמה מילים ששלטתם בהן (ירוקות) עם משפט דוגמה תקין. שננו עוד קצת ותחזרו לכאן.
-            </p>
-          `);
+          // The setup modal's own button is disabled in this state, but
+          // this is still reachable if the last word got demoted (e.g. a
+          // parallel Firebase sync) between opening the modal and clicking
+          // start.
+          this.showSentenceGameSetupModal();
           return;
         }
+        if (size !== 'all') questions = questions.slice(0, size);
 
+        this.closeModal();
         this.sentenceGameQuestions = questions;
         this.sentenceGameIndex = 0;
         this.sentenceGameStats = { correct: 0, incorrect: 0 };
@@ -3662,6 +3760,11 @@
         // game, not per-question, so a distractor's "added" state survives
         // if it happens to reappear as a distractor in a later question.
         this.sentenceGameAddedIds = new Set();
+        // Words actually missed this round, in order - surfaced by name in
+        // the end-of-round summary (see finishSentenceGame) instead of
+        // just a count, so the learner knows exactly which ones to watch
+        // for in upcoming sessions.
+        this.sentenceGameMissedWords = [];
         this.sentenceGameActive = true;
         this.render();
       }
@@ -3793,6 +3896,7 @@
           word.dueAt = null;
           word.updatedAt = Date.now();
           this.saveProgress();
+          this.sentenceGameMissedWords.push(word);
         }
 
         this.render();
@@ -3830,8 +3934,20 @@
       finishSentenceGame() {
         const { correct, incorrect } = this.sentenceGameStats;
         const total = correct + incorrect;
+        const missed = this.sentenceGameMissedWords;
         this.sentenceGameActive = false;
         this.render();
+
+        const missedListHtml = missed.length > 0 ? `
+          <div style="text-align: right; direction: rtl; max-height: 220px; overflow-y: auto; background: var(--bg-light); border: 1px solid var(--border-light); border-radius: 10px; padding: 0.75rem 1rem; margin-top: 1rem;">
+            ${missed.map(w => `
+              <div style="padding: 0.4rem 0; ${w !== missed[missed.length - 1] ? 'border-bottom: 1px solid var(--border-light);' : ''}">
+                <strong style="direction: ltr; display: inline-block;">${this.escapeHtml(w.english)}</strong> - ${this.escapeHtml(w.hebrew)}
+              </div>
+            `).join('')}
+          </div>
+        ` : '';
+
         this.showModal('🧩 סיימתם את התרגול', `
           <div style="text-align: center;">
             <div style="font-size: 2.5rem; margin-bottom: 1rem;">${incorrect === 0 ? '🎉' : '👏'}</div>
@@ -3840,8 +3956,9 @@
             </p>
             ${incorrect > 0 ? `
               <p style="color: var(--text-secondary); line-height: 1.7;">
-                ${incorrect} מילים שחשבתם ששלטתם בהן הוחזרו לשינון הרגיל - הן יופיעו שוב בשיעורים הבאים.
+                ${incorrect} מילים שחשבתם ששלטתם בהן הוחזרו לשינון הרגיל - הן יופיעו שוב בשיעורים הבאים:
               </p>
+              ${missedListHtml}
             ` : `
               <p style="color: var(--text-secondary);">
                 כל הכבוד, כל המילים שנבדקו עדיין מוכרות היטב!
