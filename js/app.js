@@ -67,7 +67,8 @@
         this.sentenceGameIndex = 0;
         this.sentenceGameStats = { correct: 0, incorrect: 0 };
         this.sentenceGameAnswered = false;
-        this.sentenceGameSelected = null;
+        this.sentenceGameSelectedId = null;
+        this.sentenceGameAddedIds = new Set();
 
         // Reading timer
         this.readingTimerActive = false;
@@ -3613,13 +3614,17 @@
           const key = candidate.english.toLowerCase();
           if (seen.has(key)) continue;
           seen.add(key);
-          distractors.push(candidate.english);
+          // Keep the real word reference (not just its english string) -
+          // the feedback screen shows each distractor's Hebrew meaning and
+          // lets the learner add it straight into rehearsal, both of which
+          // need the actual word object, not a copy of its text.
+          distractors.push(candidate);
           if (distractors.length === 3) break;
         }
         if (distractors.length < 3) return null; // not enough words to build a fair question
 
-        const options = [word.english, ...distractors].sort(() => Math.random() - 0.5);
-        return { word, sentence, options };
+        const optionWords = [word, ...distractors].sort(() => Math.random() - 0.5);
+        return { word, sentence, optionWords };
       }
 
       // Quizzes words the learner already marked as known (green) with a
@@ -3651,7 +3656,12 @@
         this.sentenceGameIndex = 0;
         this.sentenceGameStats = { correct: 0, incorrect: 0 };
         this.sentenceGameAnswered = false;
-        this.sentenceGameSelected = null;
+        this.sentenceGameSelectedId = null;
+        // Words the learner deliberately added to rehearsal from the
+        // feedback screen (see addWordToRehearsal) - tracked for the whole
+        // game, not per-question, so a distractor's "added" state survives
+        // if it happens to reappear as a distractor in a later question.
+        this.sentenceGameAddedIds = new Set();
         this.sentenceGameActive = true;
         this.render();
       }
@@ -3660,35 +3670,66 @@
         const current = this.sentenceGameQuestions[this.sentenceGameIndex];
         const total = this.sentenceGameQuestions.length;
         const word = current.word;
+        const answered = this.sentenceGameAnswered;
 
-        const optionsHtml = current.options.map(opt => {
-          const isCorrectOpt = opt === word.english;
-          const isSelected = opt === this.sentenceGameSelected;
+        const optionsHtml = current.optionWords.map(opt => {
+          const isCorrectOpt = opt.id === word.id;
+          const isSelected = opt.id === this.sentenceGameSelectedId;
           let bg = 'var(--bg-light)';
           let border = 'var(--border-light)';
-          if (this.sentenceGameAnswered) {
+          if (answered) {
             if (isCorrectOpt) { bg = 'var(--light-sage)'; border = 'var(--green)'; }
             else if (isSelected) { bg = 'rgba(255, 107, 107, 0.12)'; border = 'var(--red)'; }
           }
+
+          // Once answered, reveal every option's Hebrew meaning (not just
+          // the correct one) - the learner picked between all four, so all
+          // four are worth seeing translated. Distractors the learner
+          // doesn't already know can be added straight into rehearsal from
+          // here; the target word is excluded since a wrong answer already
+          // sends it back into memorization automatically (see
+          // answerSentenceGame), and a right answer means it's already
+          // known.
+          let belowHtml = '';
+          if (answered) {
+            const meaning = `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.35rem; direction: rtl;">${this.escapeHtml(opt.hebrew)}</div>`;
+            let addHtml = '';
+            if (!isCorrectOpt && opt.status !== 'green') {
+              if (this.sentenceGameAddedIds.has(opt.id)) {
+                addHtml = `<div style="margin-top: 0.4rem; font-size: 0.78rem; color: var(--sage-green); font-weight: 500;">✅ נוסף לשינון</div>`;
+              } else {
+                addHtml = `<button type="button" onclick="event.stopPropagation(); app.addWordToRehearsal(${opt.id})" style="margin-top: 0.4rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.78rem; text-decoration: underline;">➕ הוסף גם אותה לשינון</button>`;
+              }
+            }
+            belowHtml = meaning + addHtml;
+          }
+
           return `
-            <button type="button" ${this.sentenceGameAnswered ? 'disabled' : ''}
-              onclick="app.answerSentenceGame('${this.escapeHtml(opt).replace(/'/g, "\\'")}')"
-              style="padding: 0.9rem 1rem; border: 2px solid ${border}; background: ${bg}; border-radius: 10px; font-size: 1rem; direction: ltr; text-align: center; cursor: ${this.sentenceGameAnswered ? 'default' : 'pointer'}; font-weight: 500; color: var(--text-primary);">
-              ${this.escapeHtml(opt)}
-            </button>
+            <div type="button" ${answered ? '' : `onclick="app.answerSentenceGame(${opt.id})"`}
+              style="padding: 0.9rem 1rem; border: 2px solid ${border}; background: ${bg}; border-radius: 10px; text-align: center; cursor: ${answered ? 'default' : 'pointer'};">
+              <div style="font-size: 1rem; direction: ltr; font-weight: 500; color: var(--text-primary);">${this.escapeHtml(opt.english)}</div>
+              ${belowHtml}
+            </div>
           `;
         }).join('');
 
-        const feedbackHtml = this.sentenceGameAnswered ? `
+        const isCorrect = this.sentenceGameSelectedId === word.id;
+        const feedbackHtml = answered ? `
           <div style="text-align: center; margin-top: 1.25rem;">
-            <div style="font-weight: 600; margin-bottom: 0.4rem; color: ${this.sentenceGameSelected === word.english ? 'var(--sage-green)' : 'var(--red)'};">
-              ${this.sentenceGameSelected === word.english ? '✅ נכון!' : '❌ לא בדיוק'}
+            <div style="font-weight: 600; margin-bottom: 0.4rem; color: ${isCorrect ? 'var(--sage-green)' : 'var(--red)'};">
+              ${isCorrect ? '✅ נכון!' : '❌ לא בדיוק'}
             </div>
-            <div style="color: var(--text-secondary); font-size: 0.95rem;">
-              <strong>${this.escapeHtml(word.english)}</strong> - ${this.escapeHtml(word.hebrew)}
+            <div style="background: var(--bg-light); border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem; margin-top: 0.5rem; text-align: right; direction: rtl;">
+              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">💡 הסבר</div>
+              <div style="font-size: 0.95rem;">
+                המילה הנכונה היא <strong style="direction: ltr; display: inline-block;">${this.escapeHtml(word.english)}</strong> - <strong>${this.escapeHtml(word.hebrew)}</strong>.
+              </div>
+              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.4rem; direction: ltr; text-align: left;">
+                "${this.escapeHtml(word.example)}"
+              </div>
             </div>
-            ${this.sentenceGameSelected !== word.english ? `
-              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.4rem;">
+            ${!isCorrect ? `
+              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.6rem;">
                 המילה הוחזרה לשינון הרגיל כדי שתתחזק שוב.
               </div>
             ` : ''}
@@ -3731,14 +3772,14 @@
         `;
       }
 
-      answerSentenceGame(option) {
+      answerSentenceGame(wordId) {
         if (this.sentenceGameAnswered) return;
         const current = this.sentenceGameQuestions[this.sentenceGameIndex];
         const word = current.word;
-        const correct = option === word.english;
+        const correct = wordId === word.id;
 
         this.sentenceGameAnswered = true;
-        this.sentenceGameSelected = option;
+        this.sentenceGameSelectedId = wordId;
 
         if (correct) {
           this.sentenceGameStats.correct++;
@@ -3757,11 +3798,29 @@
         this.render();
       }
 
+      // Lets the learner voluntarily pull an unfamiliar *distractor* word
+      // (not the question's own target - that one's handled automatically,
+      // see answerSentenceGame) into active rehearsal straight from the
+      // feedback screen, for whenever a wrong option's revealed Hebrew
+      // meaning turns out to be one they don't know either. Marks the word
+      // "started" (updatedAt) so it's no longer capped by the new-word
+      // intake limit in startNewSession, and due immediately - without
+      // touching whatever status/streak it already has.
+      addWordToRehearsal(wordId) {
+        const word = this.words.find(w => w.id === wordId);
+        if (!word || word.status === 'green') return;
+        word.updatedAt = Date.now();
+        word.dueAt = null;
+        this.sentenceGameAddedIds.add(wordId);
+        this.saveProgress();
+        this.render();
+      }
+
       nextSentenceGameQuestion() {
         if (this.sentenceGameIndex + 1 < this.sentenceGameQuestions.length) {
           this.sentenceGameIndex++;
           this.sentenceGameAnswered = false;
-          this.sentenceGameSelected = null;
+          this.sentenceGameSelectedId = null;
           this.render();
         } else {
           this.finishSentenceGame();
