@@ -177,7 +177,13 @@
         // current tier is in play at all.
         const tierWords = this.words.filter(w => w.difficulty === this.getCurrentTier() && w.status !== 'green' && !w.leech);
 
-        if (tierWords.length === 0) return;
+        if (tierWords.length === 0) {
+          // Can happen when a manually pinned tier (see
+          // setDifficultyOverride()) is already fully mastered - without
+          // this the "התחל שינון" button would just silently do nothing.
+          this.showModal('🎉 לא נשארו מילים', '<p style="text-align: center;">שלטת בכל המילים ברמה שנבחרה. אפשר לבחור רמה אחרת, או לעבור למצב אוטומטי.</p>');
+          return;
+        }
 
         // Within the tier, also bound how many brand-new (never-attempted)
         // words are "unlocked" for study at once, instead of the entire
