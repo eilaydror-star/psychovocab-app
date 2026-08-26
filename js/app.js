@@ -55,6 +55,20 @@
         // progression" (the default). See getCurrentTier().
         this.difficultyOverride = null;
 
+        // Sentence-completion quiz ("games" menu): tests words the learner
+        // already marked as known (green), which the normal flashcard
+        // session deliberately never shows again (see renderSession's
+        // status !== 'green' filter). Entirely ephemeral - the quiz's own
+        // question list/index/score never get persisted, only the
+        // resulting word.status changes do (via the same saveProgress()
+        // path as normal grading), so there's nothing to restore on reload.
+        this.sentenceGameActive = false;
+        this.sentenceGameQuestions = [];
+        this.sentenceGameIndex = 0;
+        this.sentenceGameStats = { correct: 0, incorrect: 0 };
+        this.sentenceGameAnswered = false;
+        this.sentenceGameSelected = null;
+
         // Reading timer
         this.readingTimerActive = false;
         this.readingTimerPaused = false;
@@ -1751,6 +1765,7 @@
           return 'login';
         }
         if (this.sessionActive) return 'session';
+        if (this.sentenceGameActive) return 'sentenceGame';
         return 'start';
       }
 
@@ -1772,6 +1787,7 @@
         } else if (screen === 'start') {
           this.clearBreakTimer();
           this.sessionActive = false;
+          this.sentenceGameActive = false;
         } else if (screen === 'session') {
           this.sessionActive = this.currentSession.length > 0;
         }
@@ -1812,7 +1828,9 @@
         document.getElementById('current-streak').textContent = this.currentStreak;
         document.getElementById('sessions-today').textContent = this.sessionsToday;
         
-        if (!this.sessionActive) {
+        if (this.sentenceGameActive) {
+          this.renderSentenceGame(appContent);
+        } else if (!this.sessionActive) {
           this.renderStartScreen(appContent, stats);
         } else {
           this.renderSession(appContent);
@@ -2542,6 +2560,10 @@
 
             <button class="btn btn-secondary" onclick="app.showMasteredWordsModal()" style="width: 100%; margin-top: 0.75rem;">
               ✅ מילים ששלטתי בהן${this.words.filter(w => w.status === 'green').length > 0 ? ` (${this.words.filter(w => w.status === 'green').length})` : ''}
+            </button>
+
+            <button class="btn btn-secondary" onclick="app.startSentenceGame()" style="width: 100%; margin-top: 0.75rem;">
+              🧩 תרגול השלמת משפטים - בוחן על מילים ששלטתי בהן
             </button>
 
             <button class="btn btn-secondary" onclick="app.showFullWordListModal()" style="width: 100%; margin-top: 0.75rem;">
@@ -3559,6 +3581,223 @@
         this.saveProgress();
         this.render();
         this.showLeechWordsModal();
+      }
+
+      // Escapes regex metacharacters so an english word (e.g. one
+      // containing an apostrophe) can safely be dropped into a RegExp.
+      escapeRegExp(text) {
+        return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      // Builds one sentence-completion question from a word: its own
+      // example sentence with the word itself blanked out, plus 3 wrong
+      // options drawn from other words (same difficulty tier first, since
+      // same-tier distractors are harder to rule out by "sounds too easy/
+      // hard" alone - falling back to any other word if the tier doesn't
+      // have enough). Returns null if the word's example doesn't actually
+      // contain the word as a whole word (a handful of examples use an
+      // inflected form) - that word just can't be quizzed this way.
+      buildSentenceQuestion(word, allWords) {
+        if (!word.example) return null;
+        const re = new RegExp('\\b' + this.escapeRegExp(word.english) + '\\b', 'i');
+        if (!re.test(word.example)) return null;
+        const sentence = word.example.replace(re, '_____');
+
+        const sameTier = allWords.filter(w => w.id !== word.id && w.difficulty === word.difficulty);
+        const others = allWords.filter(w => w.id !== word.id && w.difficulty !== word.difficulty);
+        const distractorPool = [...sameTier.sort(() => Math.random() - 0.5), ...others.sort(() => Math.random() - 0.5)];
+
+        const seen = new Set([word.english.toLowerCase()]);
+        const distractors = [];
+        for (const candidate of distractorPool) {
+          const key = candidate.english.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          distractors.push(candidate.english);
+          if (distractors.length === 3) break;
+        }
+        if (distractors.length < 3) return null; // not enough words to build a fair question
+
+        const options = [word.english, ...distractors].sort(() => Math.random() - 0.5);
+        return { word, sentence, options };
+      }
+
+      // Quizzes words the learner already marked as known (green) with a
+      // psychometric-style sentence completion - the normal flashcard
+      // session never shows green words again (see renderSession), so this
+      // is the only place mastery actually gets re-checked. A wrong answer
+      // sends the word straight back into regular memorization (see
+      // answerSentenceGame) instead of just recording a score, since a
+      // missed "known" word is exactly the situation the app should react
+      // to automatically.
+      startSentenceGame() {
+        const masteredWords = this.words.filter(w => w.status === 'green');
+        const questions = masteredWords
+          .sort(() => Math.random() - 0.5)
+          .map(w => this.buildSentenceQuestion(w, this.words))
+          .filter(Boolean)
+          .slice(0, 10);
+
+        if (questions.length < 4) {
+          this.showModal('🧩 עדיין אין מספיק מילים', `
+            <p style="text-align: center; line-height: 1.8;">
+              כדי לתרגל השלמת משפטים צריך לפחות כמה מילים ששלטתם בהן (ירוקות) עם משפט דוגמה תקין. שננו עוד קצת ותחזרו לכאן.
+            </p>
+          `);
+          return;
+        }
+
+        this.sentenceGameQuestions = questions;
+        this.sentenceGameIndex = 0;
+        this.sentenceGameStats = { correct: 0, incorrect: 0 };
+        this.sentenceGameAnswered = false;
+        this.sentenceGameSelected = null;
+        this.sentenceGameActive = true;
+        this.render();
+      }
+
+      renderSentenceGame(appContent) {
+        const current = this.sentenceGameQuestions[this.sentenceGameIndex];
+        const total = this.sentenceGameQuestions.length;
+        const word = current.word;
+
+        const optionsHtml = current.options.map(opt => {
+          const isCorrectOpt = opt === word.english;
+          const isSelected = opt === this.sentenceGameSelected;
+          let bg = 'var(--bg-light)';
+          let border = 'var(--border-light)';
+          if (this.sentenceGameAnswered) {
+            if (isCorrectOpt) { bg = 'var(--light-sage)'; border = 'var(--green)'; }
+            else if (isSelected) { bg = 'rgba(255, 107, 107, 0.12)'; border = 'var(--red)'; }
+          }
+          return `
+            <button type="button" ${this.sentenceGameAnswered ? 'disabled' : ''}
+              onclick="app.answerSentenceGame('${this.escapeHtml(opt).replace(/'/g, "\\'")}')"
+              style="padding: 0.9rem 1rem; border: 2px solid ${border}; background: ${bg}; border-radius: 10px; font-size: 1rem; direction: ltr; text-align: center; cursor: ${this.sentenceGameAnswered ? 'default' : 'pointer'}; font-weight: 500; color: var(--text-primary);">
+              ${this.escapeHtml(opt)}
+            </button>
+          `;
+        }).join('');
+
+        const feedbackHtml = this.sentenceGameAnswered ? `
+          <div style="text-align: center; margin-top: 1.25rem;">
+            <div style="font-weight: 600; margin-bottom: 0.4rem; color: ${this.sentenceGameSelected === word.english ? 'var(--sage-green)' : 'var(--red)'};">
+              ${this.sentenceGameSelected === word.english ? '✅ נכון!' : '❌ לא בדיוק'}
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.95rem;">
+              <strong>${this.escapeHtml(word.english)}</strong> - ${this.escapeHtml(word.hebrew)}
+            </div>
+            ${this.sentenceGameSelected !== word.english ? `
+              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.4rem;">
+                המילה הוחזרה לשינון הרגיל כדי שתתחזק שוב.
+              </div>
+            ` : ''}
+            <button class="btn btn-primary" onclick="app.nextSentenceGameQuestion()" style="margin-top: 1rem;">
+              ${this.sentenceGameIndex + 1 < total ? 'הבא ←' : 'סיום'}
+            </button>
+          </div>
+        ` : '';
+
+        appContent.innerHTML = `
+          <div class="session-container">
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                שאלה ${this.sentenceGameIndex + 1} מתוך ${total}
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${(this.sentenceGameIndex / total) * 100}%"></div>
+              </div>
+            </div>
+
+            <div class="word-card" style="cursor: default;">
+              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                🧩 השלימו את המשפט
+              </div>
+              <div style="font-size: 1.2rem; line-height: 1.8; direction: ltr; text-align: center; margin-bottom: 1.5rem;">
+                ${this.escapeHtml(current.sentence)}
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                ${optionsHtml}
+              </div>
+              ${feedbackHtml}
+            </div>
+
+            <div style="text-align: center; margin-top: 1.5rem;">
+              <button onclick="app.exitSentenceGame()" class="btn" style="color: var(--red); border-color: var(--red);">
+                ← יציאה מהתרגול
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      answerSentenceGame(option) {
+        if (this.sentenceGameAnswered) return;
+        const current = this.sentenceGameQuestions[this.sentenceGameIndex];
+        const word = current.word;
+        const correct = option === word.english;
+
+        this.sentenceGameAnswered = true;
+        this.sentenceGameSelected = option;
+
+        if (correct) {
+          this.sentenceGameStats.correct++;
+        } else {
+          this.sentenceGameStats.incorrect++;
+          // A "known" word that was actually missed shouldn't stay green -
+          // send it back to the front of regular memorization, same as any
+          // freshly-missed word, rather than just logging a wrong answer.
+          word.status = 'red';
+          word.streak = 0;
+          word.dueAt = null;
+          word.updatedAt = Date.now();
+          this.saveProgress();
+        }
+
+        this.render();
+      }
+
+      nextSentenceGameQuestion() {
+        if (this.sentenceGameIndex + 1 < this.sentenceGameQuestions.length) {
+          this.sentenceGameIndex++;
+          this.sentenceGameAnswered = false;
+          this.sentenceGameSelected = null;
+          this.render();
+        } else {
+          this.finishSentenceGame();
+        }
+      }
+
+      finishSentenceGame() {
+        const { correct, incorrect } = this.sentenceGameStats;
+        const total = correct + incorrect;
+        this.sentenceGameActive = false;
+        this.render();
+        this.showModal('🧩 סיימתם את התרגול', `
+          <div style="text-align: center;">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem;">${incorrect === 0 ? '🎉' : '👏'}</div>
+            <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">
+              ענית נכון על <strong>${correct}</strong> מתוך <strong>${total}</strong>
+            </p>
+            ${incorrect > 0 ? `
+              <p style="color: var(--text-secondary); line-height: 1.7;">
+                ${incorrect} מילים שחשבתם ששלטתם בהן הוחזרו לשינון הרגיל - הן יופיעו שוב בשיעורים הבאים.
+              </p>
+            ` : `
+              <p style="color: var(--text-secondary);">
+                כל הכבוד, כל המילים שנבדקו עדיין מוכרות היטב!
+              </p>
+            `}
+            <button class="btn btn-primary" onclick="app.closeModal()" style="margin-top: 1rem;">סגור</button>
+          </div>
+        `);
+      }
+
+      exitSentenceGame() {
+        if (confirm('לצאת מהתרגול? מילים שכבר נענו נשמרות כרגיל.')) {
+          this.sentenceGameActive = false;
+          this.render();
+        }
       }
 
       showLeechWordsModal() {
