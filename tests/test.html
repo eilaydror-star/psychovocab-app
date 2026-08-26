@@ -91,6 +91,21 @@
     app.startBreakTimer = () => {};
     app.maybeCelebrateStreak = () => {};
 
+    // setupAutoSave()'s 30-second interval (started for real in the
+    // constructor) calls the real saveState() - not stubbed above, since
+    // several tests below need it - straight to the real localStorage key
+    // whenever app.sessionActive is true. Several tests set sessionActive
+    // true and leave fixture data (fake words, streak, study history) sitting
+    // in memory afterward without resetting it. Each individual test backs
+    // up/restores localStorage around its own assertions, but that does
+    // nothing about this interval firing later, in the background, with
+    // whatever stale in-memory state the last test left behind - if this
+    // publicly-deployed page is left open past 30s, that leftover test data
+    // gets written straight into a real user's saved progress. Since tests
+    // never rely on the interval firing (saveState is always called
+    // directly), just stop it from ever running here.
+    clearInterval(app.autoSaveInterval);
+
     // ==== getCurrentTier ====================================================
 
     test('getCurrentTier: fresh data starts on easy', () => {
