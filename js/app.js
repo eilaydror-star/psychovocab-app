@@ -3807,8 +3807,18 @@
             belowHtml = meaning + addHtml;
           }
 
+          // Kept as a div (not a <button>) because, once answered, it wraps
+          // a real nested <button> (the "add to rehearsal" link below) -
+          // a <button> inside a <button> is invalid HTML and gets
+          // silently split apart by the parser. role="button" + tabindex
+          // + a keydown handler give it the same keyboard/AT semantics as
+          // a real button without that nesting problem.
+          const interactiveAttrs = answered
+            ? 'role="group"'
+            : `role="button" tabindex="0" aria-label="${this.escapeHtml(opt.english)}" onclick="app.answerSentenceGame(${opt.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.answerSentenceGame(${opt.id});}"`;
+
           return `
-            <div type="button" ${answered ? '' : `onclick="app.answerSentenceGame(${opt.id})"`}
+            <div ${interactiveAttrs}
               style="padding: 0.9rem 1rem; border: 2px solid ${border}; background: ${bg}; border-radius: 10px; text-align: center; cursor: ${answered ? 'default' : 'pointer'};">
               <div style="font-size: 1rem; direction: ltr; font-weight: 500; color: var(--text-primary);">${this.escapeHtml(opt.english)}</div>
               ${belowHtml}
