@@ -3438,7 +3438,7 @@
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-light);">
                 <div>
                   <strong>${app.escapeHtml(profile.displayName)}</strong>
-                  <div style="font-size: 0.8rem; color: var(--text-secondary);">🔥 ${profile.streak || 0} ימים · ✅ ${profile.masteredCount || 0} מילים</div>
+                  <div style="font-size: 0.8rem; color: var(--text-secondary);">🔥 ${profile.streak || 0} ימים${profile.streakFreezes ? ` · ❄️ ${profile.streakFreezes}` : ''} · ✅ ${profile.masteredCount || 0} מילים</div>
                 </div>
                 <button onclick="app.removeFriend('${uid}')" class="btn btn-sm btn-secondary">הסר</button>
               </div>
