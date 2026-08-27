@@ -23,7 +23,7 @@
   <div class="stats-container">
     <div class="stat-card"><div class="stat-value" id="total-mastered">0</div></div>
     <div class="stat-card"><div class="stat-value" id="total-remaining">0</div></div>
-    <div class="stat-card"><div class="stat-value" id="current-streak">0</div></div>
+    <div class="stat-card"><div class="stat-value" id="current-streak">0</div><span id="streak-freeze-indicator" style="display: none;">❄️ <span id="streak-freeze-count">0</span></span></div>
     <div class="stat-card"><div class="stat-value" id="sessions-today">0</div></div>
   </div>
   <div id="app-content"></div>
@@ -445,6 +445,80 @@
       }
     });
 
+    // ==== streak freezes: skipping a day doesn't have to break the streak ===
+
+    function withRealRecordStudySession(fn) {
+      const original = app.recordStudySession; // currently the no-op override from setup
+      delete app.recordStudySession; // fall back to the real prototype method
+      try {
+        fn();
+      } finally {
+        app.recordStudySession = original;
+      }
+    }
+
+    test('daysBetweenDateKeys: counts whole calendar days between two date keys', () => {
+      assertEqual(app.daysBetweenDateKeys('2026-08-20', '2026-08-21'), 1);
+      assertEqual(app.daysBetweenDateKeys('2026-08-20', '2026-08-23'), 3);
+      assertEqual(app.daysBetweenDateKeys('2026-08-20', '2026-08-20'), 0);
+    });
+
+    test('recordStudySession: a missed day with no banked freeze resets the streak to 1', () => {
+      withRealRecordStudySession(() => {
+        app.studyHistory = {};
+        app.streakFreezes = 0;
+        app.currentStreak = 5;
+        const twoDaysAgo = app.getLocalDateKey(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
+        app.lastStudyDate = twoDaysAgo;
+        app.sessionsToday = 1;
+        app.recordStudySession();
+        assertEqual(app.currentStreak, 1, 'expected the streak to reset without a freeze to cover the missed day');
+        assertEqual(app.streakFreezes, 0, 'no freeze should be spent when the streak resets anyway');
+      });
+    });
+
+    test('recordStudySession: a banked freeze covers exactly one missed day and keeps the streak alive', () => {
+      withRealRecordStudySession(() => {
+        app.studyHistory = {};
+        app.streakFreezes = 1;
+        app.currentStreak = 5;
+        const twoDaysAgo = app.getLocalDateKey(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
+        app.lastStudyDate = twoDaysAgo;
+        app.sessionsToday = 1;
+        app.recordStudySession();
+        assertEqual(app.currentStreak, 6, 'the freeze should let the streak continue past the missed day');
+        assertEqual(app.streakFreezes, 0, 'expected the single freeze to be spent covering the one missed day');
+      });
+    });
+
+    test('recordStudySession: a multi-day gap needs one freeze per missed day', () => {
+      withRealRecordStudySession(() => {
+        app.studyHistory = {};
+        app.streakFreezes = 1; // only enough for 1 of the 2 missed days
+        app.currentStreak = 5;
+        const threeDaysAgo = app.getLocalDateKey(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000));
+        app.lastStudyDate = threeDaysAgo; // 2 full days missed in between
+        app.sessionsToday = 1;
+        app.recordStudySession();
+        assertEqual(app.currentStreak, 1, 'one freeze cannot cover a two-day gap - the streak should reset');
+        assertEqual(app.streakFreezes, 1, 'the insufficient freeze should not be spent');
+      });
+    });
+
+    test('recordStudySession: awards a new freeze every 7th consecutive day, capped', () => {
+      withRealRecordStudySession(() => {
+        app.studyHistory = {};
+        app.streakFreezes = 0;
+        app.currentStreak = 6;
+        const yesterday = app.getLocalDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
+        app.lastStudyDate = yesterday;
+        app.sessionsToday = 1;
+        app.recordStudySession();
+        assertEqual(app.currentStreak, 7);
+        assertEqual(app.streakFreezes, 1, 'expected a freeze to be awarded on reaching a 7-day streak');
+      });
+    });
+
     // ==== logout: no progress leak to the next user on this device ==========
 
     test('logout: clears in-memory state and this device\'s saved progress', async () => {
@@ -464,6 +538,7 @@
       try {
         app.words = [makeWord({ id: 'leaked-word', status: 'green' })];
         app.currentStreak = 5;
+        app.streakFreezes = 2;
         app.studyHistory = { '2026-08-01': 2 };
         app.currentSession = [app.words[0]];
         app.sessionActive = true;
@@ -484,6 +559,7 @@
 
         assert(!app.words.some(w => w.id === 'leaked-word'), 'in-memory words should be reset to the fresh dataset, not carry over the outgoing account\'s words');
         assertEqual(app.currentStreak, 0);
+        assertEqual(app.streakFreezes, 0, 'streakFreezes should not leak to the next guest/account on this device');
         assertEqual(Object.keys(app.studyHistory).length, 0);
         assertEqual(app.sessionActive, false);
         assertEqual(app.currentSession.length, 0);
@@ -806,6 +882,7 @@
     function freshAccumulatorState() {
       app.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
       app.currentStreak = 0;
+      app.streakFreezes = 0;
       app.sessionsToday = 0;
       app.lastStudyDate = null;
       app.studyHistory = {};
@@ -874,6 +951,7 @@
       app.words = [makeWord({ id: 'w1' })];
       app.allTimeStats = { totalAttempts: 1, totalCorrect: 1 };
       app.currentStreak = 7;
+      app.streakFreezes = 1;
       app.sessionsToday = 2;
       app.lastStudyDate = '2026-08-24';
       app.studyHistory = { '2026-08-24': 2 };
@@ -890,6 +968,7 @@
         assert(capturedHref !== null, 'expected a download link to be created');
         const parsed = await (await fetch(capturedHref)).json();
         assertEqual(parsed.currentStreak, 7, 'exported backup should include the current streak');
+        assertEqual(parsed.streakFreezes, 1, 'exported backup should include streakFreezes');
         assertEqual(parsed.sessionsToday, 2, 'exported backup should include sessions-today');
         assertEqual(parsed.lastStudyDate, '2026-08-24', 'exported backup should include lastStudyDate');
         assertEqual(parsed.studyHistory['2026-08-24'], 2, 'exported backup should include studyHistory');
@@ -913,6 +992,7 @@
       try {
         app.words = [makeWord({ id: 'old-word' })];
         app.currentStreak = 0;
+        app.streakFreezes = 0;
         app.sessionsToday = 0;
         app.lastStudyDate = null;
         app.studyHistory = {};
@@ -920,7 +1000,7 @@
         app.importProgress(makeFakeFileEvent(JSON.stringify({
           words: [importedWord],
           allTimeStats: { totalAttempts: 1, totalCorrect: 1 },
-          currentStreak: 12, sessionsToday: 3, lastStudyDate: '2026-08-24', studyHistory: { '2026-08-24': 3 }
+          currentStreak: 12, streakFreezes: 2, sessionsToday: 3, lastStudyDate: '2026-08-24', studyHistory: { '2026-08-24': 3 }
         })));
         await waitForFileRead();
 
@@ -928,6 +1008,7 @@
         assertEqual(app.words[0].updatedAt, null, 'missing updatedAt should backfill to null');
         assertEqual(app.words[0].flagged, false, 'missing flagged should backfill to false');
         assertEqual(app.currentStreak, 12, 'import should restore the streak from the backup');
+        assertEqual(app.streakFreezes, 2, 'import should restore streakFreezes from the backup');
         assertEqual(app.sessionsToday, 3);
         assertEqual(app.lastStudyDate, '2026-08-24');
         assertEqual(app.studyHistory['2026-08-24'], 3);

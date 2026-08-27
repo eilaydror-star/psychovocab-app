@@ -18,6 +18,7 @@
         this.sessionStats = { correct: 0, incorrect: 0, streak: 0 };
         this.lastAction = null; // Last grid mark, for undo
         this.currentStreak = 0; // Consecutive calendar days studied
+        this.streakFreezes = 0; // Banked "skip a day without breaking the streak" tokens - see recordStudySession
         this.sessionsToday = 0; // Sessions started today - encourages multiple short visits, not just one/day
         this.lastStudyDate = null; // 'YYYY-MM-DD'
         this.studyHistory = {}; // 'YYYY-MM-DD' -> sessions count, for the progress activity view
@@ -342,6 +343,29 @@
         return `${y}-${m}-${d}`;
       }
 
+      // Whole number of calendar days between two 'YYYY-MM-DD' keys (b - a).
+      // Both are parsed as UTC midnight, so the local timezone offset that
+      // getLocalDateKey() already baked into the string doesn't get applied
+      // a second time here.
+      daysBetweenDateKeys(a, b) {
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const aTime = new Date(`${a}T00:00:00Z`).getTime();
+        const bTime = new Date(`${b}T00:00:00Z`).getTime();
+        return Math.round((bTime - aTime) / msPerDay);
+      }
+
+      // Awards one streak freeze per full week of consecutive days, up to a
+      // small cap - mirrors Duolingo's "streak freeze": earned automatically,
+      // never purchased, so a missed day doesn't have to mean starting over.
+      static STREAK_FREEZE_MAX = 5;
+
+      maybeAwardStreakFreeze() {
+        if (this.currentStreak === 0 || this.currentStreak % 7 !== 0) return;
+        if (this.streakFreezes >= VocabularyApp.STREAK_FREEZE_MAX) return;
+        this.streakFreezes++;
+        this.showToast(`❄️ צברת הקפאת רצף! (${this.streakFreezes} זמינות)`);
+      }
+
       recordStudySession() {
         // Tracks both a day-level streak (don't break the chain) and a
         // same-day session count (multiple short visits per day is how
@@ -354,11 +378,29 @@
           return;
         }
 
-        const yesterday = this.getLocalDateKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
-        this.currentStreak = (this.lastStudyDate === yesterday) ? this.currentStreak + 1 : 1;
+        if (!this.lastStudyDate) {
+          this.currentStreak = 1;
+        } else {
+          const gapDays = this.daysBetweenDateKeys(this.lastStudyDate, today);
+          const missedDays = gapDays - 1;
+          if (gapDays === 1) {
+            this.currentStreak += 1;
+          } else if (missedDays > 0 && this.streakFreezes >= missedDays) {
+            // Enough banked freezes to cover every missed day - the streak
+            // continues instead of resetting, and the freezes are spent.
+            this.streakFreezes -= missedDays;
+            this.currentStreak += 1;
+            this.showToast(missedDays === 1
+              ? '❄️ הקפאת רצף שמרה על הרצף שלך אחרי יום שהוחמץ!'
+              : `❄️ ${missedDays} הקפאות רצף שמרו על הרצף שלך!`);
+          } else {
+            this.currentStreak = 1;
+          }
+        }
         this.lastStudyDate = today;
         this.sessionsToday = 1;
 
+        this.maybeAwardStreakFreeze();
         this.maybeCelebrateStreak();
       }
 
@@ -1072,6 +1114,7 @@
           words: this.words,
           allTimeStats: this.allTimeStats,
           currentStreak: this.currentStreak,
+          streakFreezes: this.streakFreezes,
           sessionsToday: this.sessionsToday,
           lastStudyDate: this.lastStudyDate,
           studyHistory: this.studyHistory,
@@ -1203,6 +1246,7 @@
               });
               this.allTimeStats = committed.allTimeStats || this.allTimeStats;
               this.currentStreak = committed.currentStreak ?? this.currentStreak;
+              this.streakFreezes = committed.streakFreezes ?? this.streakFreezes;
               this.sessionsToday = committed.sessionsToday ?? this.sessionsToday;
               this.lastStudyDate = committed.lastStudyDate ?? this.lastStudyDate;
               this.studyHistory = committed.studyHistory ?? this.studyHistory;
@@ -1245,16 +1289,20 @@
         const remoteLastStudyDate = remoteData && remoteData.lastStudyDate;
         const remoteSessionsToday = (remoteData && remoteData.sessionsToday) || 0;
         const remoteCurrentStreak = (remoteData && remoteData.currentStreak) || 0;
+        const remoteStreakFreezes = (remoteData && remoteData.streakFreezes) || 0;
         let lastStudyDate = this.lastStudyDate;
         let sessionsToday = this.sessionsToday;
         let currentStreak = this.currentStreak;
+        let streakFreezes = this.streakFreezes;
         if (remoteLastStudyDate && remoteLastStudyDate === this.lastStudyDate) {
           sessionsToday = Math.max(this.sessionsToday, remoteSessionsToday);
           currentStreak = Math.max(this.currentStreak, remoteCurrentStreak);
+          streakFreezes = Math.max(this.streakFreezes, remoteStreakFreezes);
         } else if (remoteLastStudyDate && (!this.lastStudyDate || remoteLastStudyDate > this.lastStudyDate)) {
           lastStudyDate = remoteLastStudyDate;
           sessionsToday = remoteSessionsToday;
           currentStreak = remoteCurrentStreak;
+          streakFreezes = remoteStreakFreezes;
         }
 
         // studyHistory: union of both sides' date keys, taking the higher
@@ -1280,7 +1328,7 @@
         // just keep whatever this device currently has set.
         const difficultyOverride = this.difficultyOverride;
 
-        return { allTimeStats, currentStreak, sessionsToday, lastStudyDate, studyHistory, sessionActive, sessionStats, difficultyOverride, _keepRemoteSession: keepRemoteSession };
+        return { allTimeStats, currentStreak, streakFreezes, sessionsToday, lastStudyDate, studyHistory, sessionActive, sessionStats, difficultyOverride, _keepRemoteSession: keepRemoteSession };
       }
 
       // Publishes just the stats needed for the friends feature (never
@@ -1294,6 +1342,7 @@
         db.ref(`publicProfiles/${currentUser.uid}`).set({
           displayName: currentUser.displayName || (currentUser.email || 'תלמיד').split('@')[0],
           streak: this.currentStreak,
+          streakFreezes: this.streakFreezes,
           sessionsToday: this.sessionsToday,
           masteredCount: stats.mastered,
           updatedAt: firebase.database.ServerValue.TIMESTAMP
@@ -1347,6 +1396,7 @@
               this.words = freshWords;
               this.allTimeStats = data.allTimeStats || this.allTimeStats;
               this.currentStreak = data.currentStreak ?? this.currentStreak;
+              this.streakFreezes = data.streakFreezes ?? this.streakFreezes;
               this.sessionsToday = data.sessionsToday ?? this.sessionsToday;
               this.lastStudyDate = data.lastStudyDate ?? this.lastStudyDate;
               this.studyHistory = data.studyHistory ?? this.studyHistory;
@@ -1408,6 +1458,7 @@
           this.words = this.initializeWords();
           this.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
           this.currentStreak = 0;
+          this.streakFreezes = 0;
           this.sessionsToday = 0;
           this.lastStudyDate = null;
           this.studyHistory = {};
@@ -1514,6 +1565,7 @@
             this.words = freshWords; // Use fresh words array
             this.allTimeStats = data.allTimeStats;
             this.currentStreak = data.currentStreak || 0;
+            this.streakFreezes = data.streakFreezes || 0;
             this.sessionsToday = data.sessionsToday || 0;
             this.lastStudyDate = data.lastStudyDate || null;
             this.studyHistory = data.studyHistory || {};
@@ -1528,6 +1580,7 @@
           words: this.words,
           allTimeStats: this.allTimeStats,
           currentStreak: this.currentStreak,
+          streakFreezes: this.streakFreezes,
           sessionsToday: this.sessionsToday,
           lastStudyDate: this.lastStudyDate,
           studyHistory: this.studyHistory,
@@ -1598,6 +1651,7 @@
             this.words = data.words;
             this.allTimeStats = data.allTimeStats;
             this.currentStreak = data.currentStreak || 0;
+            this.streakFreezes = data.streakFreezes || 0;
             this.sessionsToday = data.sessionsToday || 0;
             this.lastStudyDate = data.lastStudyDate || null;
             this.studyHistory = data.studyHistory || {};
@@ -1875,6 +1929,11 @@
         document.getElementById('total-remaining').textContent = stats.remaining;
         document.getElementById('current-streak').textContent = this.currentStreak;
         document.getElementById('sessions-today').textContent = this.sessionsToday;
+        const freezeIndicator = document.getElementById('streak-freeze-indicator');
+        if (freezeIndicator) {
+          document.getElementById('streak-freeze-count').textContent = this.streakFreezes;
+          freezeIndicator.style.display = this.streakFreezes > 0 ? 'inline' : 'none';
+        }
         
         if (this.sentenceGameActive) {
           this.renderSentenceGame(appContent);
@@ -2307,6 +2366,7 @@
             this.words = this.initializeWords();
             this.allTimeStats = { totalAttempts: 0, totalCorrect: 0 };
             this.currentStreak = 0;
+            this.streakFreezes = 0;
             this.sessionsToday = 0;
             this.lastStudyDate = null;
             this.studyHistory = {};
