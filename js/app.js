@@ -686,12 +686,12 @@
             <div style="margin-bottom: 2rem;">
               <h4 style="color: #FFA500; margin-bottom: 1rem;">🟡 בינוני - ספרים בעלי מורכבות בינונית</h4>
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
-                <strong>📖 Penguin Classics - Abridged</strong>
+                <strong>📖 Oxford Bookworms Library</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                  ספרים קלאסיים מקוצרים ללימוד יעיל
+                  ספרים מדורגים לפי רמת אוצר מילים, נכתבו במיוחד ללומדי אנגלית
                 </p>
-                <a href="https://www.penguin.co.uk" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
-                  ▶ www.penguin.co.uk
+                <a href="https://elt.oup.com/catalogue/items/global/graded_readers/oxford_bookworms_library/" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ Oxford Bookworms Library
                 </a>
               </div>
 
