@@ -2841,7 +2841,7 @@
                 <span class="english-word">${this.escapeHtml(word.english)}</span>
                 <button type="button" class="speak-btn" data-word="${this.escapeHtml(word.english)}" onclick="event.stopPropagation(); app.speakWord(this)" aria-label="השמע הגייה" title="השמע הגייה">🔊</button>
               </div>
-              <div class="hebrew-translation hidden" id="hebrew-word">${this.escapeHtml(word.hebrew)}</div>
+              <div class="hebrew-translation hidden" id="hebrew-word">${word.partOfSpeech ? `<span class="part-of-speech-tag">${this.escapeHtml(word.partOfSpeech)}</span>` : ''}${this.escapeHtml(word.hebrew)}</div>
               <div class="example-sentence hidden" id="example-sentence">${this.escapeHtml(word.example || '')}</div>
               <div id="toggle-hint" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">לחץ לגילוי התרגום</div>
               <button onclick="event.stopPropagation(); app.toggleNoteField(${word.id})" style="margin-top: 1.5rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">

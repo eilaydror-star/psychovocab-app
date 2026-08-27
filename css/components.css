@@ -262,6 +262,19 @@
   display: none !important;
 }
 
+.part-of-speech-tag {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--sage-green);
+  background: var(--light-sage);
+  border-radius: 8px;
+  padding: 0.1rem 0.5rem;
+  margin-inline-end: 0.5rem;
+  direction: ltr;
+  vertical-align: middle;
+}
+
 .example-sentence {
   font-size: 0.95rem;
   font-style: italic;
