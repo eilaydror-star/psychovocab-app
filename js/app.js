@@ -651,17 +651,7 @@
         const content = `
           <div style="max-height: 70vh; overflow-y: auto;">
             <div style="margin-bottom: 2rem;">
-              <h4 style="color: #51CF66; margin-bottom: 1rem;">🟢 קל - ספרים שכיחים ופשוטים</h4>
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
-                <strong>📖 Project Gutenberg</strong>
-                <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                  אתר בחינם עם אלפי ספרים קלאסיים - התחל עם "Alice in Wonderland"
-                </p>
-                <a href="https://www.gutenberg.org" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
-                  ▶ www.gutenberg.org
-                </a>
-              </div>
-              
+              <h4 style="color: #51CF66; margin-bottom: 1rem;">🟢 קל - לבניית אוצר מילים בסיסי</h4>
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 BBC Learning English</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
@@ -671,18 +661,28 @@
                   ▶ BBC Learning English
                 </a>
               </div>
-              
-              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px;">
-                <strong>📖 Wattpad - Young Adult</strong>
+
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
+                <strong>📖 News in Levels - Level 1</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                  סיפורים משתמשים קלים בשפה פשוטה
+                  חדשות אמיתיות בשפה פשוטה במיוחד, עם 500 המילים הנפוצות ביותר
                 </p>
-                <a href="https://www.wattpad.com" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
-                  ▶ www.wattpad.com
+                <a href="https://www.newsinlevels.com" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ www.newsinlevels.com
+                </a>
+              </div>
+
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px;">
+                <strong>📖 Simple English Wikipedia</strong>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
+                  אותם ערכים כמו בוויקיפדיה הרגילה, אך בשפה ובמשפטים פשוטים
+                </p>
+                <a href="https://simple.wikipedia.org" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ simple.wikipedia.org
                 </a>
               </div>
             </div>
-            
+
             <div style="margin-bottom: 2rem;">
               <h4 style="color: #FFA500; margin-bottom: 1rem;">🟡 בינוני - ספרים בעלי מורכבות בינונית</h4>
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
@@ -694,17 +694,27 @@
                   ▶ www.penguin.co.uk
                 </a>
               </div>
-              
+
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
-                <strong>📖 News in Levels</strong>
+                <strong>📖 News in Levels - Level 2/3</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                  אותה כתבה בשלוש רמות קושי - קל, בינוני, קשה
+                  אותה כתבה ברמת קושי גבוהה יותר, לאחר שהתרגלת לרמה הקלה
                 </p>
                 <a href="https://www.newsinlevels.com" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
                   ▶ www.newsinlevels.com
                 </a>
               </div>
-              
+
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
+                <strong>📖 Newsela</strong>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
+                  כתבות חדשות אמיתיות שנכתבות מחדש במספר רמות קריאה
+                </p>
+                <a href="https://newsela.com" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ newsela.com
+                </a>
+              </div>
+
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px;">
                 <strong>📖 Medium - Popular Articles</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
@@ -715,9 +725,19 @@
                 </a>
               </div>
             </div>
-            
+
             <div>
               <h4 style="color: #FF6B6B; margin-bottom: 1rem;">🔴 קשה - ספרים קשים ומעמיקים</h4>
+              <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
+                <strong>📖 Project Gutenberg</strong>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
+                  ספרות קלאסית בחינם - אנגלית עשירה וישנה, מתאים לרמה מתקדמת
+                </p>
+                <a href="https://www.gutenberg.org" target="_blank" style="color: var(--teal); font-size: 0.9rem; text-decoration: none;">
+                  ▶ www.gutenberg.org
+                </a>
+              </div>
+
               <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 0.8rem;">
                 <strong>📖 The Guardian - Opinion</strong>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
