@@ -3832,13 +3832,15 @@
             <div style="font-weight: 600; margin-bottom: 0.4rem; color: ${isCorrect ? 'var(--sage-green)' : 'var(--red)'};">
               ${isCorrect ? '✅ נכון!' : '❌ לא בדיוק'}
             </div>
-            <div style="background: var(--bg-light); border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem; margin-top: 0.5rem; text-align: right; direction: rtl;">
+            <div style="background: var(--bg-light); border: 2px solid var(--sage-green); border-radius: 10px; padding: 1rem 1.1rem; margin-top: 0.5rem; direction: ltr; text-align: center;">
+              <div style="font-size: 1.15rem; line-height: 1.7;">
+                "${this.escapeHtml(word.example).replace(new RegExp(`\\b${word.english}\\b`, 'i'), `<strong style="color: var(--sage-green); text-decoration: underline;">${this.escapeHtml(word.english)}</strong>`)}"
+              </div>
+            </div>
+            <div style="background: var(--bg-light); border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem; margin-top: 0.75rem; text-align: right; direction: rtl;">
               <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">💡 הסבר</div>
               <div style="font-size: 0.95rem;">
                 המילה הנכונה היא <strong style="direction: ltr; display: inline-block;">${this.escapeHtml(word.english)}</strong> - <strong>${this.escapeHtml(word.hebrew)}</strong>.
-              </div>
-              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.4rem; direction: ltr; text-align: left;">
-                "${this.escapeHtml(word.example)}"
               </div>
             </div>
             ${!isCorrect ? `
