@@ -1962,7 +1962,7 @@
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 0.8rem;">📋 <strong>רשימת כל המילים</strong> - כל 4,000 המילים, מסודרות לפי רמת קושי, לעיון חופשי מחוץ לשיעור.</div>
               <div style="margin-bottom: 0.8rem;">👥 <strong>חברים</strong> - למי שמחובר עם חשבון: משתפים קוד עם חבר כדי להוסיף אותו ולהשוות רצפים.</div>
-              <div>📖 <strong>משאבי קריאה באנגלית</strong> - קישורים לתרגול קריאה באנגלית ברמת הפסיכומטרי.</div>
+              <div>📖 <strong>משאבי קריאה באנגלית</strong> - קישורים לתרגול קריאה באנגלית, מתויגים לפי רמת קושי (🟢 קל / 🟡 בינוני / 🔴 קשה) כמו מערכת הרמזור.</div>
             </div>
 
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">📅 איך ללמוד נכון</h3>
