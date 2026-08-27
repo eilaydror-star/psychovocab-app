@@ -22,6 +22,7 @@ Live site: https://eilaydror-star.github.io/psychovocab-app/
 - A sentence-completion quiz ("תרגול השלמת משפטים") tests mastered (green) words in context - pick a difficulty tier and round size, then choose the missing word in an English sentence from multiple options; ends with a summary of any missed words
 - "רשימת כל המילים" shows the full 4,000-word list grouped by difficulty tier, for free browsing outside a session
 - A logged-in user can add friends by sharing a code and compare streaks
+- "משאבי קריאה באנגלית" links to external English reading practice (BBC Learning English, News in Levels, Simple English Wikipedia, Oxford Bookworms Library, Newsela, Medium, Project Gutenberg, The Guardian, Aeon, Scientific American), each tagged 🟢/🟡/🔴 to match the app's own difficulty tiers
 - If the learner keeps studying past ~7 minutes without a break, a modal nudges them to rest
 
 ## Project structure
