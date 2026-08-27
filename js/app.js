@@ -901,20 +901,30 @@
 
       goBack() {
         // Exit session and return to menu - automatically save progress
-        if (confirm('הגיע לך להפסיק את השיעור? ההתקדמות תישמר.')) {
-          this.clearBreakTimer();
-          this.saveProgress(); // Auto-save before exiting
-          this.sessionActive = false;
-          this.sessionIndex = 0;
-          // Otherwise pressing undo after starting a brand-new session (or
-          // even just leaving without grading anything else) would still
-          // act on a word from the session that was just exited - it isn't
-          // part of currentSession any more, but undo() doesn't require
-          // that, so it would silently mutate a word's status/streak/dueAt
-          // from a past session and decrement the just-reset session stats.
-          this.lastAction = null;
-          this.render();
-        }
+        this.showModal('⏸️ להפסיק את השיעור?', `
+          <p style="text-align: center; color: var(--text-secondary);">
+            ההתקדמות תישמר.
+          </p>
+          <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="app.closeModal()">המשך שיעור</button>
+            <button class="btn btn-primary" style="flex: 1;" onclick="app.closeModal(); app.confirmGoBack();">חזור לתפריט</button>
+          </div>
+        `);
+      }
+
+      confirmGoBack() {
+        this.clearBreakTimer();
+        this.saveProgress(); // Auto-save before exiting
+        this.sessionActive = false;
+        this.sessionIndex = 0;
+        // Otherwise pressing undo after starting a brand-new session (or
+        // even just leaving without grading anything else) would still
+        // act on a word from the session that was just exited - it isn't
+        // part of currentSession any more, but undo() doesn't require
+        // that, so it would silently mutate a word's status/streak/dueAt
+        // from a past session and decrement the just-reset session stats.
+        this.lastAction = null;
+        this.render();
       }
 
       undo() {
@@ -4099,10 +4109,20 @@
       }
 
       exitSentenceGame() {
-        if (confirm('לצאת מהתרגול? מילים שכבר נענו נשמרות כרגיל.')) {
-          this.sentenceGameActive = false;
-          this.render();
-        }
+        this.showModal('⏸️ לצאת מהתרגול?', `
+          <p style="text-align: center; color: var(--text-secondary);">
+            מילים שכבר נענו נשמרות כרגיל.
+          </p>
+          <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="app.closeModal()">המשך תרגול</button>
+            <button class="btn btn-primary" style="flex: 1;" onclick="app.closeModal(); app.confirmExitSentenceGame();">חזור לתפריט</button>
+          </div>
+        `);
+      }
+
+      confirmExitSentenceGame() {
+        this.sentenceGameActive = false;
+        this.render();
       }
 
       showLeechWordsModal() {
