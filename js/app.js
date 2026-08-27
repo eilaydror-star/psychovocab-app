@@ -857,7 +857,7 @@
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault();
           const word = this.getCurrentSessionWord();
-          if (word) this.gradeCurrentCard(word, false);
+          if (word) this.attemptGradeUnknown(word);
         } else if (e.key === ' ') {
           e.preventDefault();
           this.toggleTranslation();
@@ -899,11 +899,13 @@
       toggleTranslation() {
         const hebrewEl = document.getElementById('hebrew-word');
         const exampleEl = document.getElementById('example-sentence');
+        const usageNoteEl = document.getElementById('usage-note');
         const hintEl = document.getElementById('toggle-hint');
         if (!hebrewEl) return;
         hebrewEl.classList.toggle('hidden');
         const isHidden = hebrewEl.classList.contains('hidden');
         if (exampleEl) exampleEl.classList.toggle('hidden', isHidden);
+        if (usageNoteEl) usageNoteEl.classList.toggle('hidden', isHidden);
         if (hintEl) hintEl.style.display = isHidden ? 'block' : 'none';
         if (!isHidden) this._revealed = true;
       }
@@ -919,9 +921,11 @@
         }
         const hebrewEl = document.getElementById('hebrew-word');
         const exampleEl = document.getElementById('example-sentence');
+        const usageNoteEl = document.getElementById('usage-note');
         const hintEl = document.getElementById('toggle-hint');
         if (hebrewEl) hebrewEl.classList.remove('hidden');
         if (exampleEl) exampleEl.classList.remove('hidden');
+        if (usageNoteEl) usageNoteEl.classList.remove('hidden');
         if (hintEl) {
           hintEl.textContent = 'עכשיו כשראיתם את התרגום - החליקו שוב ימינה לאישור שאתם יודעים';
           hintEl.style.display = 'block';
@@ -936,6 +940,41 @@
           if (!el) return;
           el.classList.remove('pending-confirm');
           void el.offsetWidth; // restart the animation if triggered again
+          el.classList.add('pending-confirm');
+        });
+        this._revealed = true;
+      }
+
+      // Mirrors attemptGradeKnown for the "don't know" path: the first
+      // swipe/tap/press just reveals the translation, example and usage
+      // note (so the learner actually sees *why* they got it wrong, not
+      // just that they did), the second confirms and advances. Without
+      // this two-step gate, "don't know" graded and moved on instantly,
+      // so a learner who hadn't tapped the card yet never saw the
+      // explanation at all.
+      attemptGradeUnknown(word) {
+        if (this._revealed) {
+          this.gradeCurrentCard(word, false);
+          return;
+        }
+        const hebrewEl = document.getElementById('hebrew-word');
+        const exampleEl = document.getElementById('example-sentence');
+        const usageNoteEl = document.getElementById('usage-note');
+        const hintEl = document.getElementById('toggle-hint');
+        if (hebrewEl) hebrewEl.classList.remove('hidden');
+        if (exampleEl) exampleEl.classList.remove('hidden');
+        if (usageNoteEl) usageNoteEl.classList.remove('hidden');
+        if (hintEl) {
+          hintEl.textContent = 'עכשיו כשראיתם את התרגום - החליקו שוב שמאלה לאישור';
+          hintEl.style.display = 'block';
+          hintEl.classList.add('confirm-pending');
+        }
+        const dontKnowBtn = document.querySelector('.grade-circle-btn.dont-know');
+        const swipeIncorrect = document.querySelector('.swipe-direction.incorrect');
+        [dontKnowBtn, swipeIncorrect].forEach(el => {
+          if (!el) return;
+          el.classList.remove('pending-confirm');
+          void el.offsetWidth;
           el.classList.add('pending-confirm');
         });
         this._revealed = true;
@@ -2843,6 +2882,7 @@
               </div>
               <div class="hebrew-translation hidden" id="hebrew-word">${word.partOfSpeech ? `<span class="part-of-speech-tag">${this.escapeHtml(word.partOfSpeech)}</span>` : ''}${this.escapeHtml(word.hebrew)}</div>
               <div class="example-sentence hidden" id="example-sentence">${this.escapeHtml(word.example || '')}</div>
+              ${word.usageNote ? `<div class="usage-note hidden" id="usage-note">💡 ${this.escapeHtml(word.usageNote)}</div>` : ''}
               <div id="toggle-hint" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">לחץ לגילוי התרגום</div>
               <button onclick="event.stopPropagation(); app.toggleNoteField(${word.id})" style="margin-top: 1.5rem; background: none; border: none; color: var(--sage-green); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">
                 📝 ${word.association ? 'ערוך רמז אישי' : 'הוסף רמז אישי - אסוציאציה מומלצת'}
@@ -2866,7 +2906,7 @@
             </div>
 
             <div class="grade-buttons">
-              <button class="grade-circle-btn dont-know" onclick="this.blur(); app.gradeCurrentCard(app.getCurrentSessionWord(), false)">
+              <button class="grade-circle-btn dont-know" onclick="this.blur(); app.attemptGradeUnknown(app.getCurrentSessionWord())">
                 <span class="grade-circle">✕</span>
                 <span class="grade-label">לא מכיר</span>
               </button>
@@ -3496,16 +3536,16 @@
           if (Math.abs(dx) < minSwipeDistance) { resetCard(); return; }
 
           this._justSwiped = true;
+          const wasRevealed = this._revealed;
           if (dx > 0) {
-            const wasRevealed = this._revealed;
             this.attemptGradeKnown(word);
-            // Not revealed yet: attemptGradeKnown only flipped the card
-            // face-up, it didn't grade/remove it - snap back to center
-            // instead of leaving it dragged off to the side.
-            if (!wasRevealed) resetCard();
           } else {
-            this.gradeCurrentCard(word, false);
+            this.attemptGradeUnknown(word);
           }
+          // Not revealed yet: attemptGradeKnown/attemptGradeUnknown only
+          // flipped the card face-up, it didn't grade/remove it - snap
+          // back to center instead of leaving it dragged off to the side.
+          if (!wasRevealed) resetCard();
         };
 
         element.addEventListener('touchstart', (e) => {

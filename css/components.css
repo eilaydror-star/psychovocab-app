@@ -290,6 +290,22 @@
   display: none !important;
 }
 
+.usage-note {
+  font-size: 0.88rem;
+  color: var(--sage-green);
+  background: var(--light-sage);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  margin: 0 1rem 0.5rem;
+  line-height: 1.5;
+}
+
+.usage-note.hidden {
+  opacity: 0;
+  pointer-events: none;
+  display: none !important;
+}
+
 .hebrew-note {
   font-size: 0.95rem;
   color: var(--teal);
@@ -701,6 +717,16 @@
 }
 
 .swipe-direction.correct.pending-confirm {
+  animation: confirmPulse 0.55s ease-in-out 2;
+}
+
+.grade-circle-btn.dont-know.pending-confirm .grade-circle {
+  animation: confirmPulse 0.55s ease-in-out 2;
+  background: #F3E4E1;
+  border-color: var(--red);
+}
+
+.swipe-direction.incorrect.pending-confirm {
   animation: confirmPulse 0.55s ease-in-out 2;
 }
 
