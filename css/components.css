@@ -659,6 +659,64 @@
   color: var(--text-secondary);
 }
 
+/* Fires once when a "know" tap/swipe only reveals the translation and is
+   waiting for the confirming second tap/swipe - makes it obvious at a
+   glance that another action is needed, without relying on the small
+   hint text getting read. */
+@keyframes confirmPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 14px rgba(20, 42, 29, 0.1);
+  }
+  30% {
+    transform: scale(1.14);
+    box-shadow: 0 10px 26px rgba(74, 122, 90, 0.5);
+  }
+  60% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 20px rgba(74, 122, 90, 0.25);
+  }
+}
+
+.grade-circle-btn.know.pending-confirm .grade-circle {
+  animation: confirmPulse 0.55s ease-in-out 2;
+  background: var(--light-sage);
+  border-color: var(--sage-green);
+}
+
+.swipe-direction.correct.pending-confirm {
+  animation: confirmPulse 0.55s ease-in-out 2;
+}
+
+@keyframes hintPop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+#toggle-hint.confirm-pending {
+  display: inline-block !important;
+  animation: hintPop 0.3s ease-out;
+  color: var(--sage-green);
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: var(--light-sage);
+  border: 1px solid rgba(74, 122, 90, 0.3);
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
+}
+
 .swiping-left {
   transform: translateX(20px);
   opacity: 0.7;

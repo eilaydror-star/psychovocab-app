@@ -883,8 +883,19 @@
         if (hintEl) {
           hintEl.textContent = 'עכשיו כשראיתם את התרגום - החליקו שוב ימינה לאישור שאתם יודעים';
           hintEl.style.display = 'block';
-          hintEl.style.color = 'var(--sage-green)';
+          hintEl.classList.add('confirm-pending');
         }
+        // A brief pulse on the "know" button and the swipe-hint arrow so a
+        // new user immediately sees where the confirming tap/swipe goes,
+        // instead of having to notice and read the small hint text.
+        const knowBtn = document.querySelector('.grade-circle-btn.know');
+        const swipeCorrect = document.querySelector('.swipe-direction.correct');
+        [knowBtn, swipeCorrect].forEach(el => {
+          if (!el) return;
+          el.classList.remove('pending-confirm');
+          void el.offsetWidth; // restart the animation if triggered again
+          el.classList.add('pending-confirm');
+        });
         this._revealed = true;
       }
 
