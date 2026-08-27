@@ -2861,7 +2861,32 @@
         word.updatedAt = Date.now();
         this.saveProgress();
         this.syncFlagReport(word);
+        if (word.flagged) {
+          this.showToast('✓ תודה, נבדוק!');
+        }
         this.render();
+      }
+
+      // Brief, self-dismissing confirmation message so actions like flagging
+      // a word give the user visible proof something happened, without
+      // interrupting the flow with a modal or alert().
+      showToast(message) {
+        let toast = document.getElementById('app-toast');
+        if (!toast) {
+          toast = document.createElement('div');
+          toast.id = 'app-toast';
+          toast.className = 'toast';
+          document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        clearTimeout(this._toastTimeout);
+        // Force reflow so re-triggering the class while already visible still animates.
+        toast.classList.remove('show');
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        this._toastTimeout = setTimeout(() => {
+          toast.classList.remove('show');
+        }, 2200);
       }
 
       // Flags are otherwise private to each user's own progress node (by
