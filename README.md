@@ -18,6 +18,11 @@ Live site: https://eilaydror-star.github.io/psychovocab-app/
 - Firebase sync merges per-word progress by `updatedAt`, and merges the aggregate fields (streak, sessions-today, study history, all-time stats) too, so two tabs/devices studying around the same time don't clobber each other's counters
 - Studying as a guest and then logging into (or registering) an existing account asks whether to merge the guest device's local progress into the account or discard it - it's never merged silently, since a guest's just-touched words would otherwise look "newer" than real, older cloud progress and overwrite it
 - Export/import (in the save/progress modal) includes streak, sessions-today, and study history alongside word progress and all-time stats, so restoring a backup doesn't reset your streak
+- A word missed 4+ times (even across separate sessions) is auto-flagged as a "leech" and pulled out of normal rotation so it doesn't keep clogging sessions; it's listed under "מילים עקשניות" and can be manually reactivated
+- A sentence-completion quiz ("תרגול השלמת משפטים") tests mastered (green) words in context - pick a difficulty tier and round size, then choose the missing word in an English sentence from multiple options; ends with a summary of any missed words
+- "רשימת כל המילים" shows the full 4,000-word list grouped by difficulty tier, for free browsing outside a session
+- A logged-in user can add friends by sharing a code and compare streaks
+- If the learner keeps studying past ~7 minutes without a break, a modal nudges them to rest
 
 ## Project structure
 

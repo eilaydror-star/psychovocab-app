@@ -1683,35 +1683,34 @@
               
               <div>
                 <strong style="color: #51CF66;">🟩 ירוק - שולט!</strong>
-                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.3rem;">זכרת פעמיים נכון ברציפות. המילה נשלטת!</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.3rem;">שרדת ארבעה סבבי חזרה עולים ברצף. המילה נשלטת לטווח ארוך!</p>
               </div>
             </div>
-            
+
             <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">🔄 חזרה משכללת</h3>
-            
-            <p style="margin-bottom: 1rem; line-height: 1.8;">המערכת משתמשת במדע הוכח: חזרה משכללת משפרת זיכרון לטווח ארוך.</p>
-            
+
+            <p style="margin-bottom: 1rem; line-height: 1.8;">המערכת משתמשת במדע הוכח: כל תשובה נכונה מרחיקה את המבחן הבא על המילה - כדי לוודא שהיא באמת נחרטת בזיכרון לטווח ארוך, ולא רק שינון רגעי.</p>
+
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 1rem; font-size: 0.95rem;">
-                <strong>📍 שלב 1:</strong> למדת מילה → רואה אותה שוב בעוד שעות
+                <strong>📍 שלב 1:</strong> למדת מילה → רואה אותה שוב בעוד 4 שעות
               </div>
               <div style="margin-bottom: 1rem; font-size: 0.95rem;">
-                <strong>📍 שלב 2:</strong> זכרת אותה → רואה אותה בעוד 3-6 שעות
+                <strong>📍 שלב 2:</strong> זכרת אותה → רואה אותה שוב בעוד יום
+              </div>
+              <div style="margin-bottom: 1rem; font-size: 0.95rem;">
+                <strong>📍 שלב 3:</strong> זכרת שוב → רואה אותה שוב בעוד 3 ימים
+              </div>
+              <div style="margin-bottom: 1rem; font-size: 0.95rem;">
+                <strong>📍 שלב 4:</strong> זכרת שוב → רואה אותה שוב בעוד שבוע
               </div>
               <div style="font-size: 0.95rem;">
-                <strong>📍 שלב 3:</strong> זכרת פעמיים → רואה אותה בעוד יום לאישור סופי
+                <strong>📍 שלב 5:</strong> זכרת גם אחרי שבוע → 🟩 המילה נשלטת סופית!
               </div>
             </div>
-            
-            <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">⏰ לוח זמנים תיאורטי</h3>
-            
-            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem; font-size: 0.9rem;">
-              <div style="margin-bottom: 0.8rem;"><strong>09:00 בבוקר:</strong> למדת "Ambitious" (אדום 🟥)</div>
-              <div style="margin-bottom: 0.8rem;"><strong>11:00 בבוקר:</strong> ענית נכון (כתום 🟧)</div>
-              <div style="margin-bottom: 0.8rem;"><strong>15:00 אחר הצהריים:</strong> ענית נכון שוב (ירוק 🟩 שולט!)</div>
-              <div><strong>מחר בבוקר:</strong> תראה אותה לאישור סופי</div>
-            </div>
-            
+
+            <p style="margin-bottom: 1rem; line-height: 1.8; color: var(--text-secondary); font-size: 0.9rem;">טעות באמצע הדרך? המילה חוזרת ישר לאדום ומתחילה את הסבב מחדש - כך שרק מילים שבאמת נחרתו טוב מגיעות לירוק.</p>
+
             <h3 style="color: var(--teal); margin: 1.5rem 0 1rem;">💡 טיפים להצלחה</h3>
             
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
@@ -1929,12 +1928,26 @@
               <div style="margin-bottom: 0.8rem;">📝 <strong>הוסף רמז אישי</strong> - כתבו דרך לזכור את המילה, או לחצו ״הצע לי אסוציאציה״ לקבל רעיון אוטומטי.</div>
               <div style="margin-bottom: 0.8rem;">🚩 <strong>סימון תרגום שגוי</strong> - אם תרגום נראה לא נכון, סמנו אותו כדי שנבדוק אותו.</div>
               <div style="margin-bottom: 0.8rem;">↶ <strong>ביטול</strong> - טעיתם בהחלקה? כפתור הביטול (או מקש U) מחזיר את הסימון האחרון.</div>
-              <div>✅ <strong>מילים ששלטתם בהן</strong> - ברשימת ״מילים ששלטתי בהן״ בתפריט הראשי אפשר לראות את כל המילים הירוקות, ואם אחת מהן בעצם לא ידועה לכם טוב - להחזיר אותה לשינון בלחיצה אחת.</div>
+              <div style="margin-bottom: 0.8rem;">✅ <strong>מילים ששלטתם בהן</strong> - ברשימת ״מילים ששלטתי בהן״ בתפריט הראשי אפשר לראות את כל המילים הירוקות, ואם אחת מהן בעצם לא ידועה לכם טוב - להחזיר אותה לשינון בלחיצה אחת.</div>
+              <div>🐌 <strong>מילים עקשניות</strong> - מילה שטעיתם בה הרבה פעמים (גם בשיעורים שונים) מסומנת אוטומטית כ״עקשנית״ ומוצאת זמנית מהשיעורים הרגילים, כדי שלא תעכב אתכם. אפשר לראות את הרשימה ולהחזיר מילה לשינון רגיל בכפתור ״מילים עקשניות״ בתפריט.</div>
+            </div>
+
+            <h3 style="color: var(--teal); margin-bottom: 0.75rem;">🧩 תרגול השלמת משפטים</h3>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
+              <div style="margin-bottom: 0.8rem;">כשיש לכם כמה מילים ירוקות (״ששלטתי בהן״), אפשר לבחור בתפריט הראשי ״תרגול השלמת משפטים״ - במקום לתרגם, מקבלים משפט באנגלית עם מילה חסרה ובוחרים את המילה הנכונה מכמה אפשרויות. זו בדיקה נוספת שאתם באמת מכירים את המילה בהקשר, לא רק זוכרים תרגום.</div>
+              <div>אפשר לבחור מראש רמת קושי וכמות שאלות לסבב. בסוף הסבב מוצג סיכום עם המילים שטעיתם בהן.</div>
+            </div>
+
+            <h3 style="color: var(--teal); margin-bottom: 0.75rem;">📋 עוד בתפריט הראשי</h3>
+            <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; margin-bottom: 1.5rem;">
+              <div style="margin-bottom: 0.8rem;">📋 <strong>רשימת כל המילים</strong> - כל 4,000 המילים, מסודרות לפי רמת קושי, לעיון חופשי מחוץ לשיעור.</div>
+              <div style="margin-bottom: 0.8rem;">👥 <strong>חברים</strong> - למי שמחובר עם חשבון: משתפים קוד עם חבר כדי להוסיף אותו ולהשוות רצפים.</div>
+              <div>📖 <strong>משאבי קריאה באנגלית</strong> - קישורים לתרגול קריאה באנגלית ברמת הפסיכומטרי.</div>
             </div>
 
             <h3 style="color: var(--teal); margin-bottom: 0.75rem;">📅 איך ללמוד נכון</h3>
             <div style="background: var(--bg-light); padding: 1rem; border-radius: 2px; border: 1px solid var(--border-light);">
-              <div style="margin-bottom: 0.8rem;">✅ עדיף כמה שיעורים קצרים ביום מאשר שיעור ארוך אחד - זה מה שה-🔥 רצף וה-🎯 שיעורים היום בראש המסך עוקבים אחריו.</div>
+              <div style="margin-bottom: 0.8rem;">✅ עדיף כמה שיעורים קצרים ביום מאשר שיעור ארוך אחד - זה מה שה-🔥 רצף וה-🎯 שיעורים היום בראש המסך עוקבים אחריו. אם אתם ממשיכים ברצף בלי הפסקה, האפליקציה תזכיר לכם לנוח כל כמה דקות.</div>
               <div style="margin-bottom: 0.8rem;">✅ כברירת מחדל הרמה (קל/בינוני/קשה) עולה אוטומטית - ברגע ששולטים בכל מילות הרמה הנוכחית, נפתחת הרמה הבאה. אפשר גם לבחור רמה ידנית במסך הראשי.</div>
               <div>✅ ההתקדמות נשמרת אוטומטית במכשיר, ואם תתחבר עם חשבון - גם מסתנכרנת בין מכשירים.</div>
             </div>
@@ -2385,78 +2398,99 @@
             <h3>🚦 מערכת הרמזור</h3>
             
             <p style="margin-bottom: 1.5rem; line-height: 1.8;">
-              כל מילה עוברת דרך שלושה שלבים עד שהיא נשלטת לחלוטין. בכל שיעור אתם רואים מילים אקראיות מכל השלבים. המטרה היא להגיע לשלב הירוק (✅ שלוט) עבור כל המילים!
+              כל מילה עוברת סבב חזרה עולה עד שהיא נשלטת לחלוטין לטווח ארוך. בכל שיעור אתם רואים מילים אקראיות מכל השלבים. המטרה היא להגיע לשלב הירוק (✅ שלוט) עבור כל המילים!
             </p>
-            
+
             <div class="legend-item">
               <div class="legend-dot" style="background: var(--red);"></div>
               <span><strong>🟥 אדום (חדש):</strong> המילה חדשה או קיבלת אותה בטעות. חזור לתחילה!</span>
             </div>
-            
+
             <div class="legend-item">
               <div class="legend-dot" style="background: var(--orange);"></div>
-              <span><strong>🟧 כתום (התחלה):</strong> זכרתם את המילה פעם אחת נכון. אתם בדרך הנכונה!</span>
+              <span><strong>🟧 כתום (בתהליך):</strong> זכרתם את המילה נכון לפחות פעם אחת. עוד סבבים מרווחים והולכים - ואתם בדרך לירוק!</span>
             </div>
-            
+
             <div class="legend-item">
               <div class="legend-dot" style="background: var(--green);"></div>
-              <span><strong>🟩 ירוק (שלוט):</strong> זכרת את המילה פעמיים נכון ברציפות. המילה נשלטת!</span>
+              <span><strong>🟩 ירוק (שלוט):</strong> שרדתם ארבעה סבבי חזרה עולים ברצף. המילה נשלטת לטווח ארוך!</span>
             </div>
-            
+
             <h3 style="margin-top: 2rem;">🔄 מערכת החזרה המרווחת (Spaced Repetition)</h3>
-            
+
             <p style="margin-bottom: 1.5rem; line-height: 1.8;">
-              אנחנו משתמשים במערכת מתמטית שהוכחה שמשפרת את הזיכרון לטווח ארוך:
+              אנחנו משתמשים במערכת מתמטית שהוכחה שמשפרת את הזיכרון לטווח ארוך: כל תשובה נכונה מרחיקה את הבדיקה הבאה על אותה מילה, כדי לוודא שהיא באמת שרדה במעבר הזמן ולא רק נשמרה לרגע:
             </p>
-            
+
             <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <div style="margin-bottom: 1rem;">
                 <strong>📍 שלב 1 (אדום - חדש):</strong>
                 <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">
-                  למדתם את המילה בפעם הראשונה. תראו אותה שוב בשיעור הבא וביום זה (תוך שעות ספורות)
+                  למדתם את המילה בפעם הראשונה. תראו אותה שוב בעוד 4 שעות.
                 </p>
               </div>
-              
+
               <div style="margin-bottom: 1rem;">
-                <strong>📍 שלב 2 (כתום - התחלה):</strong>
+                <strong>📍 שלב 2 (כתום):</strong>
                 <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">
-                  זכרת אותה! עכשיו תראה אותה שוב בעוד 3-6 שעות. זה כדי לתחזק את הזיכרון שלך.
+                  זכרת אותה! עכשיו תראה אותה שוב בעוד יום.
                 </p>
               </div>
-              
-              <div>
-                <strong>📍 שלב 3 (ירוק - שולט):</strong>
+
+              <div style="margin-bottom: 1rem;">
+                <strong>📍 שלב 3 (כתום):</strong>
                 <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">
-                  זכרת אותה פעמיים! המילה הוסרה מהתור הרגיל. תראה אותה שוב בעוד יום או יומיים כדי לוודא שנשארת בזיכרון.
+                  זכרת שוב! עכשיו תראה אותה שוב בעוד 3 ימים.
+                </p>
+              </div>
+
+              <div style="margin-bottom: 1rem;">
+                <strong>📍 שלב 4 (כתום):</strong>
+                <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">
+                  זכרת שוב! עכשיו תראה אותה שוב בעוד שבוע - הבדיקה האחרונה.
+                </p>
+              </div>
+
+              <div>
+                <strong>📍 שלב 5 (ירוק - שולט):</strong>
+                <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.5rem;">
+                  זכרת אותה גם אחרי שבוע שלם! המילה הוסרה מהתור הרגיל - היא באמת נחרתה בזיכרון.
                 </p>
               </div>
             </div>
-            
-            <h3 style="margin-top: 2rem;">⏰ לוח זמנים לחזרה מרווחת במהלך היום</h3>
-            
+
+            <p style="margin-bottom: 1.5rem; line-height: 1.8; color: var(--text-secondary); font-size: 0.95rem;">
+              טעות באמצע הסבב? המילה חוזרת ישר לאדום ומתחילה מחדש מהשלב הראשון - כדי שהירוק תמיד יבטא שליטה אמיתית, לא ניחוש חד-פעמי.
+            </p>
+
+            <h3 style="margin-top: 2rem;">⏰ לוח זמנים לדוגמה</h3>
+
             <p style="margin-bottom: 1.5rem; line-height: 1.8;">
               <strong>דוגמה תיאורטית ללמידת מילה חדשה:</strong>
             </p>
-            
+
             <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 2px;">
               <div style="display: grid; gap: 1rem;">
                 <div>
-                  <strong style="color: var(--teal);">09:00 בבוקר:</strong> למדת מילה חדשה "Ambitious" → 🟥 אדום
+                  <strong style="color: var(--teal);">היום, 09:00:</strong> למדת מילה חדשה "Ambitious" → 🟥 אדום
                 </div>
                 <div>
-                  <strong style="color: var(--teal);">11:00 בבוקר:</strong> ראית את "Ambitious" שוב וענית נכון → 🟧 כתום
+                  <strong style="color: var(--teal);">היום, 13:00 (עוד 4 שעות):</strong> ענית נכון → 🟧 כתום, הבדיקה הבאה בעוד יום
                 </div>
                 <div>
-                  <strong style="color: var(--teal);">15:00 אחר הצהריים:</strong> ראית את "Ambitious" שוב וענית נכון → 🟩 ירוק (שולט!)
+                  <strong style="color: var(--teal);">מחר:</strong> ענית נכון → 🟧 כתום, הבדיקה הבאה בעוד 3 ימים
                 </div>
                 <div>
-                  <strong style="color: var(--teal);">מחר בבוקר:</strong> תראה את "Ambitious" לבדיקה אחרונה → נשארת בזיכרון לטווח ארוך
+                  <strong style="color: var(--teal);">בעוד 4 ימים:</strong> ענית נכון → 🟧 כתום, הבדיקה הבאה בעוד שבוע
+                </div>
+                <div>
+                  <strong style="color: var(--teal);">בעוד כשבוע וחצי:</strong> ענית נכון בפעם החמישית → 🟩 ירוק (שולט לטווח ארוך!)
                 </div>
               </div>
             </div>
-            
+
             <h3 style="margin-top: 2rem;">💡 טיפים לשלמות</h3>
-            
+
             <div style="background: var(--bg-card-hover); padding: 1.5rem; border-radius: 2px; margin-bottom: 1.5rem;">
               <ul style="list-style: none; padding: 0;">
                 <li style="margin-bottom: 1rem;">✅ <strong>עשה שיעורים מרובים ביום:</strong> תחזק את הזיכרון שלך</li>
@@ -2466,11 +2500,11 @@
               </ul>
             </div>
           </div>
-          
+
           <div class="mastery-section">
             <div class="mastery-title">🎯 כלל השולט</div>
             <div class="mastery-description">
-              בקצרה: כאשר אתם מצליחים לזכור מילה נכון <strong>פעמיים ברציפות</strong>, היא מוגדרת כשלוטה ויורדת מהתור הפעיל. תמשיכו לחזור עליה מדי פעם כדי לשמור על ההישג!
+              בקצרה: מילה נשלטת רק אחרי שאתם מצליחים לזכור אותה נכון <strong>בארבעה סבבי חזרה עולים ברצף (4 שעות, יום, 3 ימים, שבוע)</strong> - ואז היא יורדת מהתור הפעיל. טעות באמצע מחזירה אותה לתחילת הדרך.
             </div>
           </div>
           
@@ -2996,7 +3030,7 @@
         if (mastered.length === 0) {
           content = `
             <p style="text-align: center; color: var(--text-secondary);">
-              עדיין אין לכם מילים ששלטתם בהן. ברגע שתזכרו מילה נכון פעמיים ברציפות, היא תופיע כאן.
+              עדיין אין לכם מילים ששלטתם בהן. ברגע שתזכרו מילה נכון לאורך כל סבב החזרה המרווחת, היא תופיע כאן.
             </p>
           `;
         } else {
@@ -3385,9 +3419,10 @@
         // this lock, holding an arrow key (native keydown auto-repeat),
         // or a swipe immediately followed by a keypress, queues a second
         // grade against the same still-red/orange word; both timeouts
-        // then fire back-to-back and walk it red->orange->green from a
-        // single continuous input, skipping the "two correct answers a
-        // few hours apart" spaced-repetition rule entirely.
+        // then fire back-to-back and walk it forward two rungs of the
+        // ORANGE_INTERVALS_MS ramp from a single continuous input,
+        // skipping the "wait for the next rest period" spaced-repetition
+        // rule entirely.
         if (this._gradingInFlight) return;
         this._gradingInFlight = true;
 
@@ -3445,11 +3480,25 @@
         }, cardEl ? 220 : 0);
       }
 
+      // Ramp of rest periods a word climbs through while orange, each one
+      // longer than the last - real spaced repetition needs recall to
+      // survive progressively longer gaps before it counts as durably
+      // learned, not just one short rest. word.streak indexes into this
+      // (streak 1 -> ORANGE_INTERVALS_MS[0], etc.); a word only turns
+      // green after surviving the full ramp, i.e. after correctly
+      // recalling it once per interval below in sequence.
+      static ORANGE_INTERVALS_MS = [
+        4 * 60 * 60 * 1000,       // 4 hours
+        24 * 60 * 60 * 1000,      // 1 day
+        3 * 24 * 60 * 60 * 1000,  // 3 days
+        7 * 24 * 60 * 60 * 1000   // 7 days
+      ];
+
       // `forceMaster` is the one-click "I already know this perfectly"
       // path (see masterWordNow) - it skips straight to the same green
-      // end-state the normal two-correct-answers-in-a-row flow reaches on
-      // its second answer, instead of duplicating the stats/tier/undo
-      // bookkeeping below in a second function.
+      // end-state the normal ramped-recall flow reaches after climbing
+      // the full ORANGE_INTERVALS_MS ladder, instead of duplicating the
+      // stats/tier/undo bookkeeping below in a second function.
       markWordKnown(word, forceMaster = false) {
         this.lastAction = { word, prevStatus: word.status, prevStreak: word.streak, prevUpdatedAt: word.updatedAt, prevDueAt: word.dueAt, prevFailCount: word.failCount, prevLeech: word.leech, wasCorrect: true };
 
@@ -3458,25 +3507,37 @@
         // celebrate the automatic advance to the next one.
         const prevTier = this.getCurrentTier();
 
+        const intervals = this.constructor.ORANGE_INTERVALS_MS;
+
         // Progress the word's status
         if (forceMaster) {
           // Learner already knows it well and chose to skip the spaced-
           // repetition check entirely - mark it mastered immediately.
           word.status = 'green';
-          word.streak = 2;
+          word.streak = intervals.length + 1;
           word.dueAt = null;
         } else if (!word.status || word.status === 'red') {
-          // First time: red -> orange. Rest for ~4 hours before it's
-          // eligible for a confirmation round again - real spaced
-          // repetition, not an instant re-drill.
+          // First time: red -> orange. Rest before it's eligible for a
+          // confirmation round again - real spaced repetition, not an
+          // instant re-drill.
           word.status = 'orange';
           word.streak = 1;
-          word.dueAt = Date.now() + 4 * 60 * 60 * 1000;
+          word.dueAt = Date.now() + intervals[0];
         } else if (word.status === 'orange') {
-          // Second correct answer, after resting - now mastered.
-          word.status = 'green';
-          word.streak = 2;
-          word.dueAt = null;
+          if (word.streak < intervals.length) {
+            // Correct again after resting - climb to the next, longer
+            // rest period instead of mastering on just two answers. Words
+            // that keep coming back correct get checked less and less
+            // often; anything that slips gets caught by markWordUnknown
+            // and dropped straight back to red for a full restart.
+            word.streak += 1;
+            word.dueAt = Date.now() + intervals[word.streak - 1];
+          } else {
+            // Survived the full rest ramp - now durably mastered.
+            word.status = 'green';
+            word.streak += 1;
+            word.dueAt = null;
+          }
         }
         word.updatedAt = Date.now();
 
