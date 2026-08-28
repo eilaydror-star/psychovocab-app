@@ -765,6 +765,49 @@
       assertEqual(w.streak, 1);
     });
 
+    // ==== attemptGradeKnown/attemptGradeUnknown: two-step reveal-then-confirm ====
+
+    test('attemptGradeKnown: first call only reveals (does not grade), second call grades', async () => {
+      // Regression coverage for the two-step gate itself (see _attemptGrade
+      // in js/app.js) - without this, a first swipe/tap/press on "know"
+      // could silently grade the word before the learner ever saw the
+      // translation they were supposed to check themselves against.
+      const w = makeWord({ status: 'red' });
+      app.currentSession = [w];
+      app._revealed = false;
+      app._gradingInFlight = false;
+
+      app.attemptGradeKnown(w);
+      assertEqual(app._revealed, true, 'first call should reveal, not grade yet');
+      assertEqual(w.status, 'red', 'word should not be graded on the reveal-only first call');
+
+      app.attemptGradeKnown(w);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      assertEqual(w.status, 'orange', 'second call (now revealed) should actually grade the word as known');
+    });
+
+    test('attemptGradeUnknown: first call only reveals (does not grade), second call grades', async () => {
+      // Same two-step gate as attemptGradeKnown, but for "don't know" - see
+      // js/app.js: this used to grade instantly on the first swipe/press,
+      // which meant a learner who hadn't tapped the card yet never saw the
+      // wrong-answer explanation. The in-app beginner's guide describes
+      // this two-step behavior for both directions now.
+      const w = makeWord({ status: 'orange', streak: 2, failCount: 0 });
+      app.currentSession = [w];
+      app._revealed = false;
+      app._gradingInFlight = false;
+
+      app.attemptGradeUnknown(w);
+      assertEqual(app._revealed, true, 'first call should reveal, not grade yet');
+      assertEqual(w.status, 'orange', 'word should not be graded on the reveal-only first call');
+      assertEqual(w.failCount, 0, 'failCount should not change until actually graded');
+
+      app.attemptGradeUnknown(w);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      assertEqual(w.status, 'red', 'second call (now revealed) should actually grade the word as unknown');
+      assertEqual(w.failCount, 1);
+    });
+
     // ==== XSS: word data must be escaped before hitting innerHTML ===========
 
     test('renderSession: word text is HTML-escaped, not injected raw (XSS regression)', () => {

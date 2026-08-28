@@ -111,6 +111,7 @@
         this.lastStudyDate = null; // 'YYYY-MM-DD'
         this.studyHistory = {}; // 'YYYY-MM-DD' -> sessions count, for the progress activity view
         this.friends = {}; // friendUid -> true (Firebase users only, see showFriendsModal)
+        this._visualHintCache = new Map(); // word.id -> getVisualHint() result, see getVisualHint
         this.lastSaved = null;
         this.autoSaveInterval = null;
         this.breakTimerId = null; // Recommends a break after 7 min in one set - see startBreakTimer
@@ -1002,9 +1003,18 @@
       // actually seen the translation - the first attempt just reveals it
       // (so they can check themselves), the second one confirms the grade.
       // This stops "know" swipes from being a reflex that skips verification.
-      attemptGradeKnown(word) {
+      // Shared by attemptGradeKnown/attemptGradeUnknown: the first
+      // swipe/tap/press just reveals the translation, example and usage
+      // note (so the learner actually sees *why* they got it right or
+      // wrong, not just that they did), the second confirms and advances.
+      // Without this two-step gate, a grade applied and moved on instantly,
+      // so a learner who hadn't tapped the card yet never saw the
+      // explanation at all. `direction` is 'known' or 'unknown' - only the
+      // hint text and which button/arrow pulses differ between the two.
+      _attemptGrade(word, direction) {
+        const known = direction === 'known';
         if (this._revealed) {
-          this.gradeCurrentCard(word, true);
+          this.gradeCurrentCard(word, known);
           return;
         }
         const hebrewEl = document.getElementById('hebrew-word');
@@ -1015,16 +1025,18 @@
         if (exampleEl) exampleEl.classList.remove('hidden');
         if (usageNoteEl) usageNoteEl.classList.remove('hidden');
         if (hintEl) {
-          hintEl.textContent = 'עכשיו כשראיתם את התרגום - החליקו שוב ימינה לאישור שאתם יודעים';
+          hintEl.textContent = known
+            ? 'עכשיו כשראיתם את התרגום - החליקו שוב ימינה לאישור שאתם יודעים'
+            : 'עכשיו כשראיתם את התרגום - החליקו שוב שמאלה לאישור';
           hintEl.style.display = 'block';
           hintEl.classList.add('confirm-pending');
         }
-        // A brief pulse on the "know" button and the swipe-hint arrow so a
+        // A brief pulse on the matching button and swipe-hint arrow so a
         // new user immediately sees where the confirming tap/swipe goes,
         // instead of having to notice and read the small hint text.
-        const knowBtn = document.querySelector('.grade-circle-btn.know');
-        const swipeCorrect = document.querySelector('.swipe-direction.correct');
-        [knowBtn, swipeCorrect].forEach(el => {
+        const gradeBtn = document.querySelector(known ? '.grade-circle-btn.know' : '.grade-circle-btn.dont-know');
+        const swipeArrow = document.querySelector(known ? '.swipe-direction.correct' : '.swipe-direction.incorrect');
+        [gradeBtn, swipeArrow].forEach(el => {
           if (!el) return;
           el.classList.remove('pending-confirm');
           void el.offsetWidth; // restart the animation if triggered again
@@ -1033,52 +1045,38 @@
         this._revealed = true;
       }
 
-      // Mirrors attemptGradeKnown for the "don't know" path: the first
-      // swipe/tap/press just reveals the translation, example and usage
-      // note (so the learner actually sees *why* they got it wrong, not
-      // just that they did), the second confirms and advances. Without
-      // this two-step gate, "don't know" graded and moved on instantly,
-      // so a learner who hadn't tapped the card yet never saw the
-      // explanation at all.
+      attemptGradeKnown(word) {
+        this._attemptGrade(word, 'known');
+      }
+
       attemptGradeUnknown(word) {
-        if (this._revealed) {
-          this.gradeCurrentCard(word, false);
-          return;
-        }
-        const hebrewEl = document.getElementById('hebrew-word');
-        const exampleEl = document.getElementById('example-sentence');
-        const usageNoteEl = document.getElementById('usage-note');
-        const hintEl = document.getElementById('toggle-hint');
-        if (hebrewEl) hebrewEl.classList.remove('hidden');
-        if (exampleEl) exampleEl.classList.remove('hidden');
-        if (usageNoteEl) usageNoteEl.classList.remove('hidden');
-        if (hintEl) {
-          hintEl.textContent = 'עכשיו כשראיתם את התרגום - החליקו שוב שמאלה לאישור';
-          hintEl.style.display = 'block';
-          hintEl.classList.add('confirm-pending');
-        }
-        const dontKnowBtn = document.querySelector('.grade-circle-btn.dont-know');
-        const swipeIncorrect = document.querySelector('.swipe-direction.incorrect');
-        [dontKnowBtn, swipeIncorrect].forEach(el => {
-          if (!el) return;
-          el.classList.remove('pending-confirm');
-          void el.offsetWidth;
-          el.classList.add('pending-confirm');
-        });
-        this._revealed = true;
+        this._attemptGrade(word, 'unknown');
+      }
+
+      // Shared "leave this in-progress flow?" confirmation modal - goBack()
+      // and exitSentenceGame() both need one, styled like the rest of the
+      // app instead of a native confirm(); only the wording and which
+      // method actually resets state on confirm differ between them.
+      showExitConfirmModal({ title, bodyText, continueLabel, confirmMethod }) {
+        this.showModal(title, `
+          <p style="text-align: center; color: var(--text-secondary);">
+            ${bodyText}
+          </p>
+          <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="app.closeModal()">${continueLabel}</button>
+            <button class="btn btn-primary" style="flex: 1;" onclick="app.closeModal(); app.${confirmMethod}();">חזור לתפריט</button>
+          </div>
+        `);
       }
 
       goBack() {
         // Exit session and return to menu - automatically save progress
-        this.showModal('⏸️ להפסיק את השיעור?', `
-          <p style="text-align: center; color: var(--text-secondary);">
-            ההתקדמות תישמר.
-          </p>
-          <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-            <button class="btn btn-secondary" style="flex: 1;" onclick="app.closeModal()">המשך שיעור</button>
-            <button class="btn btn-primary" style="flex: 1;" onclick="app.closeModal(); app.confirmGoBack();">חזור לתפריט</button>
-          </div>
-        `);
+        this.showExitConfirmModal({
+          title: '⏸️ להפסיק את השיעור?',
+          bodyText: 'ההתקדמות תישמר.',
+          continueLabel: 'המשך שיעור',
+          confirmMethod: 'confirmGoBack'
+        });
       }
 
       confirmGoBack() {
@@ -1182,8 +1180,21 @@
       // Looks up (or heuristically guesses) an emoji that hints at the
       // word's meaning: manual dictionary first, then keyword matching
       // against the english/hebrew/example text, then a generic icon per
-      // part of speech. Returns null if nothing matches at all.
+      // part of speech. Returns null if nothing matches at all. Cached by
+      // word.id in _visualHintCache (not on the word object itself, since
+      // that gets saved to localStorage/Firebase) - this is a pure lookup
+      // over static data, so it's the same result every time for a given
+      // word, but render() calls it on every grade/undo, not just once.
       getVisualHint(word) {
+        if (this._visualHintCache.has(word.id)) {
+          return this._visualHintCache.get(word.id);
+        }
+        const hint = this._computeVisualHint(word);
+        this._visualHintCache.set(word.id, hint);
+        return hint;
+      }
+
+      _computeVisualHint(word) {
         const english = (word.english || '').toLowerCase().trim();
         if (VISUAL_HINT_WORD_MAP[english]) {
           return VISUAL_HINT_WORD_MAP[english];
@@ -4349,15 +4360,12 @@
       }
 
       exitSentenceGame() {
-        this.showModal('⏸️ לצאת מהתרגול?', `
-          <p style="text-align: center; color: var(--text-secondary);">
-            מילים שכבר נענו נשמרות כרגיל.
-          </p>
-          <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-            <button class="btn btn-secondary" style="flex: 1;" onclick="app.closeModal()">המשך תרגול</button>
-            <button class="btn btn-primary" style="flex: 1;" onclick="app.closeModal(); app.confirmExitSentenceGame();">חזור לתפריט</button>
-          </div>
-        `);
+        this.showExitConfirmModal({
+          title: '⏸️ לצאת מהתרגול?',
+          bodyText: 'מילים שכבר נענו נשמרות כרגיל.',
+          continueLabel: 'המשך תרגול',
+          confirmMethod: 'confirmExitSentenceGame'
+        });
       }
 
       confirmExitSentenceGame() {
