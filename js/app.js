@@ -2173,7 +2173,7 @@
               </div>
               <div>
                 <strong style="color: #FF6B6B;">⬅️ שמאלה = ״לא ידעתי״.</strong>
-                <span style="color: var(--text-secondary);"> מסמן מיד, בלי צורך לחשוף קודם. המילה תחזור אליכם שוב בהמשך אותו שיעור, לא תיעלם.</span>
+                <span style="color: var(--text-secondary);"> אם עוד לא ראיתם את התרגום, ההחלקה הראשונה תחשוף אותו יחד עם הסבר קצר - כך שתראו למה טעיתם, לא רק שטעיתם. תחליקו שמאלה שוב כדי לאשר. המילה תחזור אליכם שוב בהמשך אותו שיעור, לא תיעלם.</span>
               </div>
               <div style="margin-top: 0.8rem; font-size: 0.85rem; color: var(--text-secondary);">
                 🔘 לא בא לכם להחליק? מתחת לכרטיס יש גם כפתורים עגולים ✓ מכיר / ✕ לא מכיר שעושים בדיוק אותו דבר.
@@ -3120,8 +3120,25 @@
 
       // Brief, self-dismissing confirmation message so actions like flagging
       // a word give the user visible proof something happened, without
-      // interrupting the flow with a modal or alert().
+      // interrupting the flow with a modal or alert(). Queued, not
+      // overwritten - regression: recordStudySession() can call this twice
+      // back-to-back (a freeze-covered-gap toast immediately followed by a
+      // just-earned-a-new-freeze toast), and the old single-element/no-queue
+      // version let the second call silently clobber the first before
+      // anyone could read it.
       showToast(message) {
+        if (!this._toastQueue) this._toastQueue = [];
+        this._toastQueue.push(message);
+        if (!this._toastShowing) this._advanceToastQueue();
+      }
+
+      _advanceToastQueue() {
+        const message = this._toastQueue.shift();
+        if (message === undefined) {
+          this._toastShowing = false;
+          return;
+        }
+        this._toastShowing = true;
         let toast = document.getElementById('app-toast');
         if (!toast) {
           toast = document.createElement('div');
@@ -3130,13 +3147,16 @@
           document.body.appendChild(toast);
         }
         toast.textContent = message;
-        clearTimeout(this._toastTimeout);
         // Force reflow so re-triggering the class while already visible still animates.
         toast.classList.remove('show');
         void toast.offsetWidth;
         toast.classList.add('show');
+        clearTimeout(this._toastTimeout);
         this._toastTimeout = setTimeout(() => {
           toast.classList.remove('show');
+          // Small gap so back-to-back toasts are visibly distinct instances,
+          // not just a jump-cut in text on the same still-visible bubble.
+          setTimeout(() => this._advanceToastQueue(), 250);
         }, 2200);
       }
 
