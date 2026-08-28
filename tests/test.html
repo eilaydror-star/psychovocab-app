@@ -35,6 +35,25 @@
   </div>
   <input type="file" id="file-import" accept=".json">
 
+  <!-- Snapshot whatever was really in localStorage before any of the real
+       app scripts below run. Regression: the real VocabularyApp constructor
+       (js/app.js) starts a session and saves it for real, straight to the
+       real STORAGE_KEY, the moment `new VocabularyApp()` runs at the bottom
+       of app.js - which happens as soon as that <script> tag loads, before
+       this file's own inline script further down gets a chance to stub
+       app.saveProgress. Individual tests below back up/restore localStorage
+       around their own assertions, but none of them knew about - or
+       restored - this earlier, pre-test write. Net effect: just opening
+       this publicly-deployed test page silently overwrote a real visitor's
+       saved progress. Restored at the very end of the test run, below. -->
+  <script>
+    window.__realStorageSnapshot__ = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      window.__realStorageSnapshot__[k] = localStorage.getItem(k);
+    }
+  </script>
+
   <!-- Real app scripts, no Firebase SDK loaded - firebase-init.js's
        firebase.initializeApp() throws (firebase is undefined), which it
        already catches and treats as "Firebase not configured", so the app
@@ -198,12 +217,26 @@
       assert(Math.abs(w.dueAt - (before + fourHours)) < 5000, 'expected dueAt ~4h from now');
     });
 
-    test('markWordKnown: second correct answer masters the word (orange -> green)', () => {
+    test('markWordKnown: a correct answer mid-ramp climbs to the next, longer interval (stays orange)', () => {
       const w = makeWord({ status: 'orange', streak: 1 });
+      app.currentSession = [w];
+      const before = Date.now();
+      app.markWordKnown(w);
+      assertEqual(w.status, 'orange');
+      assertEqual(w.streak, 2);
+      const oneDay = 24 * 60 * 60 * 1000;
+      assert(Math.abs(w.dueAt - (before + oneDay)) < 5000, 'expected dueAt ~1 day from now (second rest interval)');
+    });
+
+    // ORANGE_INTERVALS_MS has 4 stages (4h/1d/3d/7d), so streak must reach 4
+    // (one correct answer per stage, starting from the red->orange answer)
+    // before a 5th correct answer masters the word - see markWordKnown().
+    test('markWordKnown: surviving the full rest ramp masters the word (orange -> green)', () => {
+      const w = makeWord({ status: 'orange', streak: 4 });
       app.currentSession = [w];
       app.markWordKnown(w);
       assertEqual(w.status, 'green');
-      assertEqual(w.streak, 2);
+      assertEqual(w.streak, 5);
       assertEqual(w.dueAt, null);
     });
 
@@ -212,12 +245,12 @@
       app.currentSession = [w];
       app.markWordKnown(w, true);
       assertEqual(w.status, 'green');
-      assertEqual(w.streak, 2);
+      assertEqual(w.streak, 5, 'forceMaster should land on the same streak the full ramp would end at');
       assertEqual(w.dueAt, null);
     });
 
     test('markWordKnown: reaching green clears prior leech history', () => {
-      const w = makeWord({ status: 'orange', streak: 1, leech: true, failCount: 5 });
+      const w = makeWord({ status: 'orange', streak: 4, leech: true, failCount: 5 });
       app.currentSession = [w];
       app.markWordKnown(w);
       assertEqual(w.status, 'green');
@@ -668,7 +701,7 @@
     });
 
     test('undo: restores the failCount/leech reset that happens on reaching green', () => {
-      const w = makeWord({ status: 'orange', streak: 1, failCount: 2, leech: false });
+      const w = makeWord({ status: 'orange', streak: 4, failCount: 2, leech: false });
       app.currentSession = [w];
       app.markWordKnown(w); // reaches green -> failCount/leech both reset
       assertEqual(w.failCount, 0);
@@ -678,24 +711,24 @@
       assertEqual(w.failCount, 2, 'the failCount that green-mastery reset to 0 should come back on undo');
     });
 
-    test('goBack: clears lastAction so a later Undo cannot act on a word from the exited session', () => {
+    test('confirmGoBack: clears lastAction so a later Undo cannot act on a word from the exited session', () => {
       // Regression: goBack() reset sessionActive/sessionStats but left
       // this.lastAction pointing at whatever was last graded - pressing
       // Undo after leaving (even into a totally different later session)
       // would still silently mutate that old word.
+      //
+      // goBack() itself only opens the app-styled exit-confirmation modal
+      // now (see js/app.js) - the actual state change happens in
+      // confirmGoBack(), which the modal's "back to menu" button calls.
+      // Call confirmGoBack() directly, same as that button does, instead
+      // of driving the real modal through goBack().
       const w = makeWord({ status: 'red' });
       app.currentSession = [w];
       app.markWordKnown(w); // sets lastAction
       assert(app.lastAction !== null);
 
-      const originalConfirm = window.confirm;
-      window.confirm = () => true;
-      try {
-        app.goBack();
-      } finally {
-        window.confirm = originalConfirm;
-      }
-      assertEqual(app.lastAction, null, 'goBack should clear lastAction, not just sessionActive');
+      app.confirmGoBack();
+      assertEqual(app.lastAction, null, 'confirmGoBack should clear lastAction, not just sessionActive');
     });
 
     test('startNewSession: clears lastAction from the previous session', () => {
@@ -1075,6 +1108,15 @@
       console.log(`TESTS: ${passCount}/${results.length} passed`);
       if (passCount !== results.length) {
         console.error('TESTS FAILED', results.filter(r => !r.pass));
+      }
+
+      // Put back exactly what was really in localStorage before this page's
+      // own scripts touched it (see the snapshot taken above, before the
+      // real app scripts load) - undoes the real app construction's own
+      // save, plus anything any test left behind.
+      localStorage.clear();
+      for (const k in window.__realStorageSnapshot__) {
+        localStorage.setItem(k, window.__realStorageSnapshot__[k]);
       }
     })();
   </script>
