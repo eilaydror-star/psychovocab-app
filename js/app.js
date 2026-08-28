@@ -9,51 +9,41 @@
     });
 
     // Best-effort visual/emoji hints for the study card's memory-aid area -
-    // no external API or per-word art needed, just a small manual dictionary
-    // for common concrete words plus keyword/part-of-speech fallbacks for
-    // everything else. Not meant to cover all ~4000 words on day one: a word
-    // that matches nothing here simply gets no icon (see getVisualHint).
+    // no external API or per-word art needed. Two lookup tables used to
+    // exist here: this small hand-picked one, checked first, and the much
+    // larger generated one (js/visual-hints-generated-*.js, see
+    // VISUAL_HINT_GENERATED_PARTS below), checked second and covering
+    // nearly the whole ~4000-word list. For every word present in both,
+    // this one silently won - and since they're two independently
+    // hand/LLM-authored sources for the same word, 33 of the ~124
+    // overlapping entries had actually drifted to disagree (e.g. grief was
+    // 😢 here but 😭 in the generated data), with nothing to catch it.
+    //
+    // Pruned down to only the words the generated data doesn't cover at
+    // all, so each word now has exactly one source instead of two that can
+    // silently diverge. A word that matches nothing here or in the
+    // generated data simply gets no icon (see getVisualHint) - keyword and
+    // part-of-speech fallbacks handle those instead.
     const VISUAL_HINT_WORD_MAP = {
-      dog: '🐶', cat: '🐱', bird: '🐦', fish: '🐟', horse: '🐴', cow: '🐄',
-      lion: '🦁', bear: '🐻', wolf: '🐺', mouse: '🐭', snake: '🐍', bee: '🐝',
-      insect: '🐛', spider: '🕷️', turtle: '🐢', rabbit: '🐰',
-      tree: '🌳', flower: '🌸', forest: '🌲', mountain: '⛰️', river: '🏞️',
-      ocean: '🌊', sea: '🌊', sun: '☀️', moon: '🌙', star: '⭐', sky: '🌤️',
-      rain: '🌧️', snow: '❄️', wind: '💨', fire: '🔥', earth: '🌍', stone: '🪨',
-      rock: '🪨', island: '🏝️', desert: '🏜️',
-      apple: '🍎', bread: '🍞', water: '💧', milk: '🥛', meat: '🥩',
-      fruit: '🍎', vegetable: '🥦', cheese: '🧀', egg: '🥚', rice: '🍚',
-      hungry: '🍽️', thirsty: '🥤',
-      happy: '😊', sad: '😢', angry: '😠', afraid: '😨', fear: '😨',
-      joy: '😄', love: '❤️', hate: '💔', anxious: '😰', calm: '😌',
-      surprise: '😲', proud: '😌', jealous: '😒', excited: '🤩', bored: '😐',
-      grief: '😢', hope: '🤞', despair: '😞', gratitude: '🙏',
-      family: '👪', mother: '👩', father: '👨', child: '🧒', friend: '🤝',
-      baby: '👶', parent: '👨‍👩‍👧', brother: '👦', sister: '👧', marriage: '💍',
-      body: '🧍', heart: '❤️', brain: '🧠', hand: '✋', eye: '👁️', head: '🗣️',
-      time: '⏰', hour: '🕐', day: '📅', night: '🌙', year: '📆', clock: '⏰',
-      money: '💰', pay: '💳', buy: '🛒', sell: '🏷️', price: '💲', bank: '🏦',
-      rich: '💰', poor: '🪙', expensive: '💸', cheap: '🪙', debt: '💸',
-      book: '📚', school: '🏫', teach: '🍎', learn: '📖', student: '🎓',
-      study: '📖', write: '✍️', read: '📖', exam: '📝', university: '🎓',
-      law: '⚖️', court: '⚖️', crime: '🚔', police: '👮', judge: '⚖️',
-      guilty: '⚖️', war: '⚔️', fight: '⚔️', peace: '🕊️', army: '🪖',
-      talk: '💬', speak: '🗣️', say: '💬', ask: '❓', answer: '💬',
-      argue: '💬', discuss: '💬', message: '✉️', letter: '✉️',
-      run: '🏃', walk: '🚶', jump: '🤸', travel: '✈️', car: '🚗', train: '🚆',
-      fly: '✈️', drive: '🚗', road: '🛣️', journey: '🧳', move: '➡️',
+      turtle: '🐢', earth: '🌍', fruit: '🍎', vegetable: '🥦',
+      afraid: '😨', fear: '😨', joy: '😄', love: '❤️', hate: '💔',
+      anxious: '😰', calm: '😌', surprise: '😲', jealous: '😒',
+      excited: '🤩', bored: '😐', despair: '😞', gratitude: '🙏',
+      family: '👪', parent: '👨‍👩‍👧', marriage: '💍', body: '🧍', brain: '🧠',
+      time: '⏰', day: '📅',
+      money: '💰', bank: '🏦',
+      book: '📚', school: '🏫', student: '🎓', exam: '📝', university: '🎓',
+      law: '⚖️', court: '⚖️', crime: '🚔', police: '👮', judge: '⚖️', guilty: '⚖️',
+      war: '⚔️', fight: '⚔️', peace: '🕊️', army: '🪖',
+      say: '💬', argue: '💬', discuss: '💬', message: '✉️',
+      journey: '🧳', move: '➡️',
       work: '💼', job: '💼', business: '💼', office: '🏢', meeting: '🗓️',
-      computer: '💻', phone: '📱', internet: '🌐', technology: '💻',
-      music: '🎵', art: '🎨', paint: '🎨', dance: '💃', sport: '⚽',
-      game: '🎮', ball: '⚽', win: '🏆', lose: '📉', competition: '🏆',
-      health: '🏥', doctor: '🩺', sick: '🤒', medicine: '💊', hospital: '🏥',
-      food: '🍽️', cook: '🍳', kitchen: '🍳', restaurant: '🍽️',
-      house: '🏠', home: '🏠', city: '🏙️', country: '🗺️', government: '🏛️',
-      big: '📏', small: '🔍', tall: '📏', short: '📏', heavy: '🏋️',
-      light: '💡', fast: '💨', slow: '🐢', strong: '💪', weak: '🪶',
-      hot: '🔥', cold: '🥶', clean: '🧼', dirty: '💩', dangerous: '⚠️',
-      color: '🎨', red: '🟥', blue: '🟦', green: '🟩', yellow: '🟨',
-      number: '🔢', question: '❓', idea: '💡', problem: '❗', solution: '💡'
+      computer: '💻', internet: '🌐', technology: '💻',
+      music: '🎵', art: '🎨', sport: '⚽', game: '🎮', ball: '⚽', competition: '🏆',
+      health: '🏥', medicine: '💊', hospital: '🏥',
+      food: '🍽️', kitchen: '🍳',
+      home: '🏠', city: '🏙️', country: '🗺️', government: '🏛️',
+      color: '🎨', number: '🔢', question: '❓', idea: '💡', problem: '❗', solution: '💡'
     };
 
     // Keyword rules checked against the english word, Hebrew translation
