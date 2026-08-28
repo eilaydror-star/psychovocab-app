@@ -8,6 +8,104 @@
       deferredInstallPrompt = e;
     });
 
+    // Best-effort visual/emoji hints for the study card's memory-aid area -
+    // no external API or per-word art needed, just a small manual dictionary
+    // for common concrete words plus keyword/part-of-speech fallbacks for
+    // everything else. Not meant to cover all ~4000 words on day one: a word
+    // that matches nothing here simply gets no icon (see getVisualHint).
+    const VISUAL_HINT_WORD_MAP = {
+      dog: '🐶', cat: '🐱', bird: '🐦', fish: '🐟', horse: '🐴', cow: '🐄',
+      lion: '🦁', bear: '🐻', wolf: '🐺', mouse: '🐭', snake: '🐍', bee: '🐝',
+      insect: '🐛', spider: '🕷️', turtle: '🐢', rabbit: '🐰',
+      tree: '🌳', flower: '🌸', forest: '🌲', mountain: '⛰️', river: '🏞️',
+      ocean: '🌊', sea: '🌊', sun: '☀️', moon: '🌙', star: '⭐', sky: '🌤️',
+      rain: '🌧️', snow: '❄️', wind: '💨', fire: '🔥', earth: '🌍', stone: '🪨',
+      rock: '🪨', island: '🏝️', desert: '🏜️',
+      apple: '🍎', bread: '🍞', water: '💧', milk: '🥛', meat: '🥩',
+      fruit: '🍎', vegetable: '🥦', cheese: '🧀', egg: '🥚', rice: '🍚',
+      hungry: '🍽️', thirsty: '🥤',
+      happy: '😊', sad: '😢', angry: '😠', afraid: '😨', fear: '😨',
+      joy: '😄', love: '❤️', hate: '💔', anxious: '😰', calm: '😌',
+      surprise: '😲', proud: '😌', jealous: '😒', excited: '🤩', bored: '😐',
+      grief: '😢', hope: '🤞', despair: '😞', gratitude: '🙏',
+      family: '👪', mother: '👩', father: '👨', child: '🧒', friend: '🤝',
+      baby: '👶', parent: '👨‍👩‍👧', brother: '👦', sister: '👧', marriage: '💍',
+      body: '🧍', heart: '❤️', brain: '🧠', hand: '✋', eye: '👁️', head: '🗣️',
+      time: '⏰', hour: '🕐', day: '📅', night: '🌙', year: '📆', clock: '⏰',
+      money: '💰', pay: '💳', buy: '🛒', sell: '🏷️', price: '💲', bank: '🏦',
+      rich: '💰', poor: '🪙', expensive: '💸', cheap: '🪙', debt: '💸',
+      book: '📚', school: '🏫', teach: '🍎', learn: '📖', student: '🎓',
+      study: '📖', write: '✍️', read: '📖', exam: '📝', university: '🎓',
+      law: '⚖️', court: '⚖️', crime: '🚔', police: '👮', judge: '⚖️',
+      guilty: '⚖️', war: '⚔️', fight: '⚔️', peace: '🕊️', army: '🪖',
+      talk: '💬', speak: '🗣️', say: '💬', ask: '❓', answer: '💬',
+      argue: '💬', discuss: '💬', message: '✉️', letter: '✉️',
+      run: '🏃', walk: '🚶', jump: '🤸', travel: '✈️', car: '🚗', train: '🚆',
+      fly: '✈️', drive: '🚗', road: '🛣️', journey: '🧳', move: '➡️',
+      work: '💼', job: '💼', business: '💼', office: '🏢', meeting: '🗓️',
+      computer: '💻', phone: '📱', internet: '🌐', technology: '💻',
+      music: '🎵', art: '🎨', paint: '🎨', dance: '💃', sport: '⚽',
+      game: '🎮', ball: '⚽', win: '🏆', lose: '📉', competition: '🏆',
+      health: '🏥', doctor: '🩺', sick: '🤒', medicine: '💊', hospital: '🏥',
+      food: '🍽️', cook: '🍳', kitchen: '🍳', restaurant: '🍽️',
+      house: '🏠', home: '🏠', city: '🏙️', country: '🗺️', government: '🏛️',
+      big: '📏', small: '🔍', tall: '📏', short: '📏', heavy: '🏋️',
+      light: '💡', fast: '💨', slow: '🐢', strong: '💪', weak: '🪶',
+      hot: '🔥', cold: '🥶', clean: '🧼', dirty: '💩', dangerous: '⚠️',
+      color: '🎨', red: '🟥', blue: '🟦', green: '🟩', yellow: '🟨',
+      number: '🔢', question: '❓', idea: '💡', problem: '❗', solution: '💡'
+    };
+
+    // Keyword rules checked against the english word, Hebrew translation
+    // and example sentence together, for words not in the manual map above.
+    const VISUAL_HINT_CATEGORY_RULES = [
+      { keywords: ['anger', 'furious', 'rage', 'irritat'], icon: '😠' },
+      { keywords: ['happi', 'delight', 'cheerful', 'pleas'], icon: '😊' },
+      { keywords: ['sad', 'sorrow', 'mourn', 'melanchol'], icon: '😢' },
+      { keywords: ['fear', 'afraid', 'terrif', 'dread', 'scare'], icon: '😨' },
+      { keywords: ['love', 'affection', 'romance', 'adore'], icon: '❤️' },
+      { keywords: ['money', 'financ', 'econom', 'wealth', 'invest', 'salary'], icon: '💰' },
+      { keywords: ['law', 'legal', 'court', 'justice', 'crime'], icon: '⚖️' },
+      { keywords: ['war', 'battle', 'military', 'conflict', 'weapon'], icon: '⚔️' },
+      { keywords: ['peace', 'harmony', 'calm', 'reconcil'], icon: '🕊️' },
+      { keywords: ['talk', 'speak', 'communicat', 'convers', 'discuss'], icon: '💬' },
+      { keywords: ['write', 'letter', 'text', 'document'], icon: '✍️' },
+      { keywords: ['travel', 'journey', 'voyage', 'trip'], icon: '🧳' },
+      { keywords: ['weather', 'climate', 'storm', 'temperature'], icon: '⛅' },
+      { keywords: ['animal', 'creature', 'wildlife'], icon: '🐾' },
+      { keywords: ['plant', 'nature', 'garden', 'forest'], icon: '🌿' },
+      { keywords: ['school', 'educat', 'teach', 'learn', 'student', 'academic'], icon: '📚' },
+      { keywords: ['health', 'medic', 'disease', 'ill', 'doctor', 'hospital'], icon: '🏥' },
+      { keywords: ['govern', 'politic', 'election', 'president'], icon: '🏛️' },
+      { keywords: ['work', 'career', 'employ', 'business', 'company'], icon: '💼' },
+      { keywords: ['time', 'moment', 'period', 'duration'], icon: '⏰' },
+      { keywords: ['size', 'large', 'huge', 'tiny', 'enormous'], icon: '📏' },
+      { keywords: ['music', 'song', 'sing', 'melody'], icon: '🎵' },
+      { keywords: ['food', 'eat', 'meal', 'cook', 'diet'], icon: '🍽️' },
+      { keywords: ['thought', 'think', 'idea', 'mind', 'believe'], icon: '💭' },
+      { keywords: ['question', 'doubt', 'uncertain'], icon: '❓' }
+    ];
+
+    // Last-resort fallback when nothing else matched: a generic icon per
+    // grammatical role, so at least verbs/adjectives/nouns look distinct.
+    const VISUAL_HINT_POS_FALLBACK = {
+      'v.': '🎬', 'n.': '📦', 'adj.': '🎨', 'adv.': '↗️'
+    };
+
+    // The VISUAL_HINT_PART_N globals come from js/visual-hints-generated-*.js
+    // (loaded before this file in index.html) and together cover the full
+    // ~4000-word list. Referenced defensively in case one of those files is
+    // ever missing/fails to load.
+    const VISUAL_HINT_GENERATED_PARTS = [
+      typeof VISUAL_HINT_PART_1 !== 'undefined' ? VISUAL_HINT_PART_1 : null,
+      typeof VISUAL_HINT_PART_2 !== 'undefined' ? VISUAL_HINT_PART_2 : null,
+      typeof VISUAL_HINT_PART_3 !== 'undefined' ? VISUAL_HINT_PART_3 : null,
+      typeof VISUAL_HINT_PART_4 !== 'undefined' ? VISUAL_HINT_PART_4 : null,
+      typeof VISUAL_HINT_PART_5 !== 'undefined' ? VISUAL_HINT_PART_5 : null,
+      typeof VISUAL_HINT_PART_6 !== 'undefined' ? VISUAL_HINT_PART_6 : null,
+      typeof VISUAL_HINT_PART_7 !== 'undefined' ? VISUAL_HINT_PART_7 : null
+    ];
+
     class VocabularyApp {
       constructor() {
         this.words = this.initializeWords();
@@ -1089,6 +1187,34 @@
         utterance.lang = 'en-US';
         utterance.rate = 0.9;
         window.speechSynthesis.speak(utterance);
+      }
+
+      // Looks up (or heuristically guesses) an emoji that hints at the
+      // word's meaning: manual dictionary first, then keyword matching
+      // against the english/hebrew/example text, then a generic icon per
+      // part of speech. Returns null if nothing matches at all.
+      getVisualHint(word) {
+        const english = (word.english || '').toLowerCase().trim();
+        if (VISUAL_HINT_WORD_MAP[english]) {
+          return VISUAL_HINT_WORD_MAP[english];
+        }
+        // Bulk-generated coverage for the full word list (see
+        // js/visual-hints-generated-*.js), split into several files just to
+        // keep each one a manageable size - not a build output, each is
+        // hand/LLM-authored static data checked into the repo like
+        // words-data.js.
+        for (const part of VISUAL_HINT_GENERATED_PARTS) {
+          if (part && part[english]) {
+            return part[english];
+          }
+        }
+        const haystack = `${english} ${word.hebrew || ''} ${word.example || ''}`.toLowerCase();
+        for (const rule of VISUAL_HINT_CATEGORY_RULES) {
+          if (rule.keywords.some(kw => haystack.includes(kw))) {
+            return rule.icon;
+          }
+        }
+        return VISUAL_HINT_POS_FALLBACK[word.partOfSpeech] || null;
       }
 
       generateAssociationSuggestion(word) {
@@ -2888,6 +3014,10 @@
                 📝 ${word.association ? 'ערוך רמז אישי' : 'הוסף רמז אישי - אסוציאציה מומלצת'}
               </button>
               <div id="note-field-wrapper" style="display: none; margin-top: 1rem;" onclick="event.stopPropagation()">
+                ${(() => {
+                  const visualHint = this.getVisualHint(word);
+                  return visualHint ? `<div class="visual-hint" style="margin-bottom: 0.6rem; font-size: 0.85rem; color: var(--text-secondary);">רמז ויזואלי: <span style="font-size: 1.3rem; vertical-align: middle;">${visualHint}</span></div>` : '';
+                })()}
                 <button onclick="app.suggestAssociation(${word.id})" type="button" style="margin-bottom: 0.6rem; background: var(--light-sage); border: 1px solid rgba(74, 122, 90, 0.25); color: var(--sage-green); cursor: pointer; font-size: 0.8rem; padding: 0.5rem 0.9rem; border-radius: 10px; font-weight: 500;">
                   💡 הצע לי אסוציאציה
                 </button>
