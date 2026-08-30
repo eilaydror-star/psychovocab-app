@@ -5,7 +5,8 @@
       "name": "psychovocab-static",
       "runtimeExecutable": "powershell",
       "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".claude/static-server.ps1"],
-      "port": 8934
+      "port": 8934,
+      "autoPort": true
     }
   ]
 }
