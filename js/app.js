@@ -79,7 +79,7 @@
     // Last-resort fallback when nothing else matched: a generic icon per
     // grammatical role, so at least verbs/adjectives/nouns look distinct.
     const VISUAL_HINT_POS_FALLBACK = {
-      'v.': '🎬', 'n.': '📦', 'adj.': '🎨', 'adv.': '↗️'
+      'verb.': '🎬', 'noun.': '📦', 'adjective.': '🎨', 'adverb.': '↗️'
     };
 
     // The VISUAL_HINT_PART_N globals come from js/visual-hints-generated-*.js
